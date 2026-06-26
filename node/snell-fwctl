@@ -391,7 +391,11 @@ cmd_candidates() {
     }
     ' 2>/dev/null) || candidates_json="[]"
 
-    json_ok "\"port\": ${port}, \"hours\": ${hours}, \"candidates\": ${candidates_json}"
+    local tz_offset
+    tz_offset=$(date '+%z')
+    local tz_name
+    tz_name=$(date '+%Z')
+    json_ok "\"port\": ${port}, \"hours\": ${hours}, \"tz_offset\": \"${tz_offset}\", \"tz_name\": \"${tz_name}\", \"candidates\": ${candidates_json}"
 }
 
 # ─── Command: sync ───────────────────────────────────────────────────────────

@@ -7,9 +7,10 @@
       <thead>
         <tr>
           <th>IP</th>
+          <th>目标端口</th>
           <th>状态</th>
           <th>次数</th>
-          <th>最近时间</th>
+          <th>最近时间 (台湾时区)</th>
           <th>操作</th>
         </tr>
       </thead>
@@ -18,6 +19,7 @@
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
           <td class="mono">{{ c.ip }}</td>
+          <td class="mono"><span class="tag tag-info" style="background:var(--accent-blue-trans);color:var(--accent-blue);padding:2px 6px;border-radius:4px;font-size:0.8rem;">{{ node.snell_port }}</span></td>
           <td>
             {% if c.action == "ALLOW" %}
               <span class="tag tag-allow">✅ 允许</span>
@@ -29,15 +31,16 @@
           <td class="text-secondary text-sm">{{ c.last_seen }}</td>
           <td>
             {% if not in_whitelist %}
-            <form style="display:inline;" hx-post="/api/nodes/{{ node.id }}/quick-add"
+            <form style="display:inline;align-items:center;gap:4px;" hx-post="/api/nodes/{{ node.id }}/quick-add"
                   hx-target="#toast-container" hx-swap="beforeend">
               <input type="hidden" name="ip_cidr" value="{{ c.ip }}">
-              <select name="group_id" class="form-select" style="width:auto;display:inline;padding:3px 8px;font-size:0.8rem;">
+              <span class="text-secondary" style="font-size:0.75rem;margin-right:2px;">添加到组:</span>
+              <select name="group_id" class="form-select" style="width:auto;display:inline;padding:3px 8px;font-size:0.8rem;" title="选择要加入的 IP 分组">
                 {% for group in all_groups %}
                 <option value="{{ group.id }}">{{ group.name }}</option>
                 {% endfor %}
               </select>
-              <button type="submit" class="btn btn-success btn-sm" title="加入中转组">
+              <button type="submit" class="btn btn-success btn-sm" title="将该 IP 加入选中的 IP 分组">
                 + 加入
               </button>
             </form>

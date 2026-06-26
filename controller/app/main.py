@@ -6,6 +6,7 @@ from pathlib import Path
 import urllib.request
 import json
 import asyncio
+from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -68,6 +69,31 @@ def get_flag_emoji(country_code: str) -> str:
         return "".join(chr(127397 + ord(c)) for c in country_code.upper())
     except Exception:
         return "🌐"
+
+
+def convert_to_taiwan_time(ts_str: str, tz_offset_str: str) -> str:
+    """
+    Convert naive ISO-ish timestamp string (from VPS log) and its tz_offset
+    to Taiwan time (Asia/Taipei, UTC+8).
+    """
+    if not ts_str:
+        return ""
+    try:
+        if len(tz_offset_str) != 5:
+            return ts_str.replace("T", " ")
+        sign = 1 if tz_offset_str[0] == '+' else -1
+        hours = int(tz_offset_str[1:3])
+        minutes = int(tz_offset_str[3:5])
+        
+        vps_tz = timezone(timedelta(hours=sign * hours, minutes=sign * minutes))
+        naive_dt = datetime.fromisoformat(ts_str)
+        vps_dt = naive_dt.replace(tzinfo=vps_tz)
+        
+        tw_tz = timezone(timedelta(hours=8))
+        tw_dt = vps_dt.astimezone(tw_tz)
+        return tw_dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return ts_str.replace("T", " ")
 
 
 
@@ -1148,6 +1174,12 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24):
         raise HTTPException(status_code=404)
         
     result = await ssh.get_candidates(node, hours)
+    if result.get("ok"):
+        tz_offset = result.get("tz_offset", "+0000")
+        for c in result.get("candidates", []):
+            orig_seen = c.get("last_seen", "")
+            if orig_seen:
+                c["last_seen"] = convert_to_taiwan_time(orig_seen, tz_offset)
     
     # Fetch live whitelist to see what IPs are already allowed on the node's snell port
     wl_result = await ssh.get_whitelist(node)
