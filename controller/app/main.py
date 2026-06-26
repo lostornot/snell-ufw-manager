@@ -1,11 +1,11 @@
-"""FastAPI application — routes and HTMX endpoints for VPS UFW Firewall Manager."""
-
 import ipaddress
 import logging
 import re
 from contextlib import asynccontextmanager
 from pathlib import Path
-import httpx
+import urllib.request
+import json
+import asyncio
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse
@@ -30,6 +30,24 @@ NODE_DIR = Path(__file__).parent.parent.parent / "node"
 # Geolocation & Regional Flags Helpers
 # ---------------------------------------------------------------------------
 
+def _sync_get_ip_country(host: str) -> tuple[str, str]:
+    """Blocking sync call to ip-api using urllib."""
+    url = f"http://ip-api.com/json/{host}"
+    try:
+        req = urllib.request.Request(
+            url, 
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req, timeout=3.0) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                if data.get("status") == "success":
+                    return data.get("country", "未知地区"), data.get("countryCode", "XX")
+    except Exception:
+        pass
+    return "未知地区", "XX"
+
+
 async def get_ip_country(host: str) -> tuple[str, str]:
     """Resolve IP or domain to country and country_code."""
     h = host.strip()
@@ -37,15 +55,9 @@ async def get_ip_country(host: str) -> tuple[str, str]:
     if h in ("localhost", "127.0.0.1", "::1") or h.startswith("192.168.") or h.startswith("10.") or h.startswith("172.16."):
         return "本地回环", "CN"
     try:
-        async with httpx.AsyncClient(timeout=4.0) as client:
-            resp = await client.get(f"http://ip-api.com/json/{h}")
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get("status") == "success":
-                    return data.get("country", "未知地区"), data.get("countryCode", "XX")
+        return await asyncio.to_thread(_sync_get_ip_country, h)
     except Exception:
-        pass
-    return "未知地区", "XX"
+        return "未知地区", "XX"
 
 
 def get_flag_emoji(country_code: str) -> str:
@@ -56,6 +68,7 @@ def get_flag_emoji(country_code: str) -> str:
         return "".join(chr(127397 + ord(c)) for c in country_code.upper())
     except Exception:
         return "🌐"
+
 
 
 
