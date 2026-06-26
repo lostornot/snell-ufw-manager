@@ -23,6 +23,13 @@
         <span class="tag tag-info">📍 {{ get_flag_emoji(node.country_code) }} {{ node.country or '未知地区' }}</span>
         <span class="tag tag-info mono">连接地址: {{ node.host }}:{{ node.ssh_port }}</span>
         <span class="tag tag-info">默认 SNELL 端口: {{ node.snell_port }}</span>
+        {% if node.tags %}
+          {% for tag in node.tags.split(',') %}
+            {% if tag.strip() %}
+            <span class="tag-node">🏷️ {{ tag.strip() }}</span>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
         {% if node.remark %}
         <span class="tag tag-default">备注: {{ node.remark }}</span>
         {% endif %}

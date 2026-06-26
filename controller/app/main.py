@@ -167,7 +167,7 @@ templates.env.globals["get_flag_emoji"] = get_flag_emoji
 # ---------------------------------------------------------------------------
 
 @app.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, group: str = "none"):
     """Main dashboard: all node cards grouped by region + recent operations."""
     nodes = await db.get_all_nodes()
     
@@ -184,11 +184,35 @@ async def dashboard(request: Request):
                 
     if updated_any:
         nodes = await db.get_all_nodes()
+
+    # Group by country logic
+    grouped_nodes = {}
+    if group == "country":
+        for node in nodes:
+            c = node.get("country") or "未知地区"
+            c_code = node.get("country_code") or "XX"
+            key = (c, c_code)
+            if key not in grouped_nodes:
+                grouped_nodes[key] = []
+            grouped_nodes[key].append(node)
+        # Sort groups by country name, but put "未知" at the end if exists
+        sorted_groups = sorted(
+            grouped_nodes.items(),
+            key=lambda x: (x[0][0] in ("未知地区", "未知"), x[0][0])
+        )
+    else:
+        sorted_groups = []
         
     logs = await db.get_op_logs(limit=10)
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "nodes": nodes, "logs": logs},
+        {
+            "request": request, 
+            "nodes": nodes, 
+            "logs": logs,
+            "group": group,
+            "sorted_groups": sorted_groups,
+        },
     )
 
 
@@ -782,6 +806,7 @@ async def api_create_node(
     ssh_user: str = Form("snellmgr"),
     snell_port: int = Form(...),
     snell_conf: str = Form("/root/snelldocker/snell-conf/snell.conf"),
+    tags: str = Form(""),
     remark: str = Form(""),
 ):
     country, country_code = await get_ip_country(host)
@@ -793,6 +818,7 @@ async def api_create_node(
         snell_port=snell_port,
         snell_conf=snell_conf.strip(),
         remark=remark.strip(),
+        tags=tags.strip(),
         country=country,
         country_code=country_code,
     )
@@ -826,6 +852,7 @@ async def api_update_node(
     ssh_user: str = Form("snellmgr"),
     snell_port: int = Form(...),
     snell_conf: str = Form(""),
+    tags: str = Form(""),
     remark: str = Form(""),
 ):
     await db.update_node(
@@ -836,6 +863,7 @@ async def api_update_node(
         ssh_user=ssh_user,
         snell_port=snell_port,
         snell_conf=snell_conf,
+        tags=tags.strip(),
         remark=remark,
     )
     nodes = await db.get_all_nodes()

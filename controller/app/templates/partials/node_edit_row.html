@@ -12,7 +12,10 @@
     <input class="form-input form-input-sm mono" name="snell_port" type="number" value="{{ node.snell_port }}" required style="width: 90px;">
   </td>
   <td>
-    <input class="form-input form-input-sm" name="remark" value="{{ node.remark or '' }}" placeholder="备注" style="width: 120px;">
+    <input class="form-input form-input-sm" name="tags" value="{{ node.tags or '' }}" placeholder="标签" style="width: 110px;">
+  </td>
+  <td>
+    <input class="form-input form-input-sm" name="remark" value="{{ node.remark or '' }}" placeholder="备注" style="width: 110px;">
     <input type="hidden" name="ssh_user" value="{{ node.ssh_user }}">
     <input type="hidden" name="snell_conf" value="{{ node.snell_conf }}">
   </td>

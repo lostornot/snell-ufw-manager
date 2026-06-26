@@ -3,6 +3,17 @@
   <td class="mono">{{ node.host }}</td>
   <td class="mono">{{ node.ssh_port }}</td>
   <td class="mono">{{ node.snell_port }}</td>
+  <td>
+    {% if node.tags %}
+      {% for tag in node.tags.split(',') %}
+        {% if tag.strip() %}
+        <span class="tag-node" style="margin-right: 4px; margin-bottom: 4px;">{{ tag.strip() }}</span>
+        {% endif %}
+      {% endfor %}
+    {% else %}
+      <span class="text-muted" style="font-size: 0.8rem;">—</span>
+    {% endif %}
+  </td>
   <td class="text-secondary">{{ node.remark or '—' }}</td>
   <td>
     <div class="flex gap-2" style="align-items: center;">

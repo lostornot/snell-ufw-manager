@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS nodes (
     enabled     INTEGER DEFAULT 1,
     country     TEXT DEFAULT '',
     country_code TEXT DEFAULT '',
+    tags        TEXT DEFAULT '',
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -69,6 +70,8 @@ async def init_db():
             await db.execute("ALTER TABLE nodes ADD COLUMN country TEXT DEFAULT ''")
         if "country_code" not in cols:
             await db.execute("ALTER TABLE nodes ADD COLUMN country_code TEXT DEFAULT ''")
+        if "tags" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN tags TEXT DEFAULT ''")
             
         await db.commit()
 
@@ -107,13 +110,14 @@ async def create_node(
     remark: str = "",
     country: str = "",
     country_code: str = "",
+    tags: str = "",
 ) -> int:
     async with _get_db() as db:
         await db.execute("PRAGMA foreign_keys=ON")
         cursor = await db.execute(
-            """INSERT INTO nodes (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark, country, country_code)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark, country, country_code),
+            """INSERT INTO nodes (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark, country, country_code, tags)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark, country, country_code, tags),
         )
         await db.commit()
         return cursor.lastrowid
