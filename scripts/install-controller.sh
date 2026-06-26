@@ -41,11 +41,6 @@ else
 fi
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
-  ADMIN_TOKEN="$(python3 - <<'PY'
-import secrets
-print(secrets.token_urlsafe(32))
-PY
-)"
   SESSION_SECRET="$(python3 - <<'PY'
 import secrets
 print(secrets.token_urlsafe(48))
@@ -57,7 +52,6 @@ PY
     printf 'PORT=%s\n' "$BIND_PORT"
     printf 'DATA_DIR=%s\n' "$APP_DIR/data"
     printf 'DATABASE_URL=sqlite:///%s/data/snell-ufw-control.db\n' "$APP_DIR"
-    printf 'ADMIN_TOKEN=%s\n' "$ADMIN_TOKEN"
     printf 'SESSION_SECRET=%s\n' "$SESSION_SECRET"
   } > "$APP_DIR/.env"
   chmod 600 "$APP_DIR/.env"
@@ -77,4 +71,4 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 
 printf 'Controller installed. Access it through SSH Tunnel at http://%s:%s\n' "$BIND_HOST" "$BIND_PORT"
-printf 'ADMIN_TOKEN is stored in %s/.env\n' "$APP_DIR"
+printf 'SESSION_SECRET is stored in %s/.env\n' "$APP_DIR"

@@ -43,10 +43,6 @@ def session_secret(settings: Settings) -> str:
     return settings.session_secret or "dev-session-secret-change-me"
 
 
-def admin_token(settings: Settings) -> str:
-    return settings.admin_token or "dev-admin-token-change-me"
-
-
 def create_session_cookie(settings: Settings) -> tuple[str, str]:
     csrf_token = secrets.token_urlsafe(32)
     cookie = encode_session({"authenticated": True, "csrf_token": csrf_token}, session_secret(settings))
@@ -70,4 +66,3 @@ def verify_csrf(request: Request, csrf_token: str = Form(default="")) -> None:
     expected = session.get("csrf_token")
     if not expected or not hmac.compare_digest(str(expected), csrf_token):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="invalid csrf token")
-

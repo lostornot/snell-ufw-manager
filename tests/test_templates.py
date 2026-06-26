@@ -6,9 +6,7 @@ from app.main import create_app
 
 
 def authenticated_client(monkeypatch) -> TestClient:
-    monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
     client = TestClient(create_app())
-    client.post("/login", data={"admin_token": "test-admin-token"})
     return client
 
 

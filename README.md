@@ -36,7 +36,7 @@ cd snell-ufw-manager-by-gpt
 sudo scripts/install-controller.sh
 ```
 
-The installer uses `/opt/snell-ufw-manager-by-gpt` by default, creates `data/` with mode `700`, stores the SQLite database with mode `600`, and generates `ADMIN_TOKEN` and `SESSION_SECRET` in `.env` when absent.
+The installer uses `/opt/snell-ufw-manager-by-gpt` by default, creates `data/` with mode `700`, stores the SQLite database with mode `600`, and generates `SESSION_SECRET` in `.env` when absent.
 
 ## Node Install
 

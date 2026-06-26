@@ -36,10 +36,8 @@ def setup_node(client: TestClient) -> None:
 
 
 def authenticated_client(monkeypatch, tmp_path: Path) -> TestClient:
-    monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'controller.db'}")
     client = TestClient(create_app())
-    client.post("/login", data={"admin_token": "test-admin-token"})
     setup_node(client)
     return client
 

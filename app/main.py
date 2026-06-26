@@ -12,10 +12,8 @@ from app.db import SessionLocal, configure_database, init_db
 from app.models import AccessCandidate, AuditLog, Node, RelayGroup
 from app.security import (
     SESSION_COOKIE,
-    admin_token,
     create_session_cookie,
     get_session,
-    require_session,
     verify_csrf,
 )
 from app.services.audit import write_audit
@@ -78,38 +76,9 @@ def create_app() -> FastAPI:
     def validation_error_handler(request: Request, exc: ValidationError) -> PlainTextResponse:
         return PlainTextResponse(str(exc), status_code=400)
 
-    @app.get("/login", response_class=HTMLResponse)
-    def login_page(request: Request) -> HTMLResponse:
-        return templates.TemplateResponse(
-            request,
-            "login.html",
-            {"error": None},
-        )
-
-    @app.post("/login")
-    def login(
-        request: Request,
-        admin_token_value: str = Form(alias="admin_token"),
-        db: Session = Depends(get_session_db),
-    ) -> Response:
-        if admin_token_value != admin_token(settings):
-            write_audit(
-                db,
-                actor="anonymous",
-                action="auth.login_failed",
-                summary="failed admin token login",
-                success=False,
-                error="invalid admin token",
-            )
-            return templates.TemplateResponse(
-                request,
-                "login.html",
-                {"error": "Invalid admin token"},
-                status_code=401,
-            )
-
-        cookie_value, _ = create_session_cookie(settings)
-        response = RedirectResponse("/", status_code=303)
+    def set_local_session_cookie(response: Response, cookie_value: str | None) -> Response:
+        if cookie_value is None:
+            return response
         response.set_cookie(
             SESSION_COOKIE,
             cookie_value,
@@ -119,17 +88,23 @@ def create_app() -> FastAPI:
         return response
 
     def authenticated_context(request: Request, title: str) -> dict[str, object]:
-        session = require_session(request)
+        session = get_session(request)
+        if session is None or session.get("authenticated") is not True:
+            cookie_value, csrf_token = create_session_cookie(settings)
+            request.state.local_session_cookie = cookie_value
+            session = {"authenticated": True, "csrf_token": csrf_token}
         return {
             "title": title,
             "csrf_token": session["csrf_token"],
             "bind_address": f"{settings.host}:{settings.port}",
         }
 
+    def render_authenticated(request: Request, template_name: str, context: dict[str, object]) -> HTMLResponse:
+        response = templates.TemplateResponse(request, template_name, context)
+        return set_local_session_cookie(response, getattr(request.state, "local_session_cookie", None))
+
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> Response:
-        if get_session(request) is None:
-            return RedirectResponse("/login", status_code=303)
         with SessionLocal() as db:
             context = authenticated_context(request, "总览")
             context |= {
@@ -137,13 +112,13 @@ def create_app() -> FastAPI:
                 "relay_group_count": db.query(RelayGroup).count(),
                 "audit_count": db.query(AuditLog).count(),
             }
-            return templates.TemplateResponse(request, "dashboard.html", context)
+            return render_authenticated(request, "dashboard.html", context)
 
     @app.get("/nodes", response_class=HTMLResponse)
     def nodes(request: Request, db: Session = Depends(get_session_db)) -> HTMLResponse:
         context = authenticated_context(request, "节点")
         context["nodes"] = list_nodes(db)
-        return templates.TemplateResponse(
+        return render_authenticated(
             request,
             "nodes/index.html",
             context,
@@ -242,7 +217,7 @@ def create_app() -> FastAPI:
             .limit(20)
             .all(),
         }
-        return templates.TemplateResponse(request, "nodes/detail.html", context)
+        return render_authenticated(request, "nodes/detail.html", context)
 
     @app.post("/nodes/{node_id}/edit", dependencies=[Depends(verify_csrf)])
     def node_edit(
@@ -463,7 +438,7 @@ def create_app() -> FastAPI:
     def profiles(request: Request, db: Session = Depends(get_session_db)) -> HTMLResponse:
         context = authenticated_context(request, "配置预设")
         context["profiles"] = list_profiles(db)
-        return templates.TemplateResponse(request, "profiles/index.html", context)
+        return render_authenticated(request, "profiles/index.html", context)
 
     @app.post("/profiles", dependencies=[Depends(verify_csrf)])
     def profiles_create(
@@ -505,7 +480,7 @@ def create_app() -> FastAPI:
     def relay_groups(request: Request, db: Session = Depends(get_session_db)) -> HTMLResponse:
         context = authenticated_context(request, "中转组")
         context["relay_groups"] = list_relay_groups(db)
-        return templates.TemplateResponse(
+        return render_authenticated(
             request,
             "relay_groups/index.html",
             context,
@@ -643,7 +618,7 @@ def create_app() -> FastAPI:
             "policies": policies_,
             "previews": previews,
         }
-        return templates.TemplateResponse(
+        return render_authenticated(
             request,
             "policies/index.html",
             context,
@@ -679,7 +654,7 @@ def create_app() -> FastAPI:
     def audit_logs(request: Request, db: Session = Depends(get_session_db)) -> HTMLResponse:
         context = authenticated_context(request, "操作日志")
         context["audit_logs"] = db.query(AuditLog).order_by(AuditLog.id.desc()).limit(100).all()
-        return templates.TemplateResponse(
+        return render_authenticated(
             request,
             "audit/index.html",
             context,

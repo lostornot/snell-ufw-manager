@@ -17,11 +17,9 @@ class Settings(BaseSettings):
         default="sqlite:///data/snell-ufw-control.db",
         alias="DATABASE_URL",
     )
-    admin_token: str | None = Field(default=None, alias="ADMIN_TOKEN")
     session_secret: str | None = Field(default=None, alias="SESSION_SECRET")
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

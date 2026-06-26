@@ -171,32 +171,6 @@ main {
   border: 0;
 }
 
-.login-page {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 24px;
-}
-
-.login {
-  width: min(420px, 100%);
-  padding: 28px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  box-shadow: var(--shadow);
-}
-
-.login h1 {
-  margin: 0 0 8px;
-  font-size: 26px;
-}
-
-.login p {
-  margin: 0 0 20px;
-  color: var(--muted);
-}
-
 label {
   display: grid;
   gap: 6px;

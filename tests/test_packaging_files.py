@@ -40,7 +40,7 @@ def test_controller_installer_generates_secrets_and_protects_data() -> None:
     assert "--exclude=data" in script
     assert "pyproject.toml" in script
     assert "rsync" in script
-    assert "ADMIN_TOKEN" in script
+    assert "ADMIN_TOKEN" not in script
     assert "SESSION_SECRET" in script
     assert "chmod 700" in script
     assert "chmod 600" in script
