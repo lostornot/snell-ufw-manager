@@ -246,18 +246,16 @@ fi
 
 if command -v ufw &>/dev/null; then
     # 2. Prevent SSH lockout: Detect SSH ports and allow them
-    local ssh_ports=("22")
+    ssh_ports=("22")
     
     # Detect from sshd config
     if [[ -f /etc/ssh/sshd_config ]]; then
-        local config_port
         config_port=$(grep -i '^Port ' /etc/ssh/sshd_config | awk '{print $2}' || true)
         if [[ -n "$config_port" ]]; then
             ssh_ports+=("$config_port")
         fi
     fi
     if [[ -d /etc/ssh/sshd_config.d ]]; then
-        local d_port
         d_port=$(grep -rh -i '^Port ' /etc/ssh/sshd_config.d/ 2>/dev/null | awk '{print $2}' || true)
         if [[ -n "$d_port" ]]; then
             ssh_ports+=("$d_port")
@@ -265,7 +263,6 @@ if command -v ufw &>/dev/null; then
     fi
     # Detect from current SSH connection env
     if [[ -n "${SSH_CONNECTION:-}" ]]; then
-        local conn_port
         conn_port=$(echo "$SSH_CONNECTION" | awk '{print $4}')
         if [[ -n "$conn_port" ]]; then
             ssh_ports+=("$conn_port")
