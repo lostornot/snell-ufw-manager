@@ -14,3 +14,13 @@
     </div>
   {% endfor %}
 </div>
+
+{% if ip_groups is defined and ip_groups is not none %}
+<select name="initial_ip_group_id" id="sidebar-ip-group-select" class="form-select" hx-swap-oob="true" onchange="handleSidebarGroupChange(this)">
+  <option value="">-- 不关联分组 --</option>
+  {% for group in ip_groups %}
+  <option value="{{ group.id }}">{{ group.name }} (包含 {{ group.ips | length }} IP)</option>
+  {% endfor %}
+  <option value="__new__">➕ 新建分组...</option>
+</select>
+{% endif %}

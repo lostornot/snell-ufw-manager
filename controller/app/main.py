@@ -416,6 +416,7 @@ async def api_open_port(
     tag: str = Form("Custom Rule"),
     initial_ip: str = Form(""),
     initial_ip_group_id: str = Form(""),
+    new_group_name: str = Form(""),
     target_node_ids: list[str] = Form(default=[]),
 ):
     """Open a UFW service port on multiple nodes and return updated Port Cards Grid for current node."""
@@ -427,7 +428,16 @@ async def api_open_port(
         raise HTTPException(status_code=400, detail="Invalid port number")
 
     parsed_group_id = None
-    if initial_ip_group_id.strip():
+    created_group_msg = ""
+    if initial_ip_group_id == "__new__" and new_group_name.strip():
+        try:
+            parsed_group_id = await db.create_ip_group(new_group_name.strip(), "由端口部署自动创建")
+            created_group_msg = f"并新建分组「{new_group_name.strip()}」"
+            if initial_ip and initial_ip.strip():
+                await db.add_ip_group_item(parsed_group_id, initial_ip.strip(), f"在端口 {port} 部署时自动添加")
+        except Exception:
+            pass
+    elif initial_ip_group_id.strip() and initial_ip_group_id != "__new__":
         try:
             parsed_group_id = int(initial_ip_group_id)
         except ValueError:
@@ -550,11 +560,12 @@ async def api_open_port(
     else:
         toast = {
             "type": "success",
-            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上开放端口 {port} 并部署白名单！"
+            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上开放端口 {port}{created_group_msg}并部署白名单！"
         }
 
     # Re-render current node's ports grid with toast
-    return await render_ports_grid_with_toast(request, current_node, toast)
+    refreshed_groups = await db.get_all_ip_groups()
+    return await render_ports_grid_with_toast(request, current_node, toast, ip_groups=refreshed_groups)
 
 
 @app.post("/api/nodes/{node_id}/ports/bulk-delete", response_class=HTMLResponse)
@@ -710,7 +721,7 @@ async def api_close_port(request: Request, node_id: int, port: int):
 
 
 # Helper to re-render the grid
-async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict | None):
+async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict | None, ip_groups: list | None = None):
     wl_result = await ssh.get_whitelist(node)
     rules = wl_result.get("rules", []) if wl_result.get("ok") else []
     port_data = {}
@@ -735,7 +746,7 @@ async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict
 
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
-        {"request": request, "node": node, "port_data": port_data, "toast": toast},
+        {"request": request, "node": node, "port_data": port_data, "toast": toast, "ip_groups": ip_groups},
     )
 
 

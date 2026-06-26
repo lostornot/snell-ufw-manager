@@ -70,7 +70,8 @@
       <form id="bulk-port-form"
             hx-target="#port-cards-grid"
             hx-swap="innerHTML"
-            hx-indicator="#port-action-spinner">
+            hx-indicator="#port-action-spinner"
+            hx-on::after-request="if(event.detail.successful) { this.reset(); updateSelectedCount(); handleSidebarGroupChange(this.querySelector('select[name=\'initial_ip_group_id\']')); }">
         
         <!-- Section 1: Service and Port -->
         <div class="form-section-card">
@@ -110,12 +111,17 @@
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">或选择现有 IP 分组</label>
-            <select name="initial_ip_group_id" class="form-select">
+            <select name="initial_ip_group_id" id="sidebar-ip-group-select" class="form-select" onchange="handleSidebarGroupChange(this)">
               <option value="">-- 不关联分组 --</option>
               {% for group in ip_groups %}
               <option value="{{ group.id }}">{{ group.name }} (包含 {{ group.ips | length }} IP)</option>
               {% endfor %}
+              <option value="__new__">➕ 新建分组...</option>
             </select>
+          </div>
+          <div class="form-group" id="sidebar-new-group-group" style="display: none; margin-top: 10px; margin-bottom: 0;">
+            <label class="form-label" style="font-size: 0.75rem;">新分组名称 *</label>
+            <input type="text" name="new_group_name" class="form-input" placeholder="输入新组名" disabled>
           </div>
         </div>
 
@@ -199,6 +205,21 @@ function updateSelectedCount() {
     placeholder.textContent = '选择应用节点...';
     placeholder.style.color = 'var(--text-muted)';
     placeholder.style.fontWeight = 'normal';
+  }
+}
+
+function handleSidebarGroupChange(selectEl) {
+  const container = document.getElementById('sidebar-new-group-group');
+  if (!container) return;
+  const input = container.querySelector('input[name="new_group_name"]');
+  if (selectEl.value === '__new__') {
+    container.style.display = 'block';
+    input.disabled = false;
+    input.focus();
+  } else {
+    container.style.display = 'none';
+    input.disabled = true;
+    input.value = '';
   }
 }
 
