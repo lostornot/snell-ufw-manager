@@ -96,7 +96,7 @@ if command -v ufw &>/dev/null; then
 
     # Enable and log
     ufw --force enable &>/dev/null || true
-    ufw logging on &>/dev/null || true
+    ufw logging medium &>/dev/null || ufw logging on &>/dev/null || true
     echo "完成 ✓"
 else
     echo "失败 ✗ (未安装 UFW)"

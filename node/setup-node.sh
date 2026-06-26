@@ -292,8 +292,8 @@ if command -v ufw &>/dev/null; then
     fi
 
     # 4. Enable UFW logging
-    if ufw logging on &>/dev/null; then
-        step_ok "UFW logging enabled"
+    if ufw logging medium &>/dev/null || ufw logging on &>/dev/null; then
+        step_ok "UFW logging level set to medium"
     else
         step_fail "Failed to enable UFW logging"
         (( ERRORS++ ))
