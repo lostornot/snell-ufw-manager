@@ -47,11 +47,12 @@ else
     exit 1
 fi
 
-# Check venv module
-if ! python3 -m venv --help &>/dev/null; then
-    warn "缺少 python3-venv，正在安装..."
-    apt-get update -qq && apt-get install -y -qq python3-venv
-    info "python3-venv 已安装"
+# Ensure python3-venv is installed (--help can succeed even without ensurepip)
+VENV_PKG="python3.${PY_MINOR}-venv"
+if ! dpkg -s "${VENV_PKG}" &>/dev/null 2>&1; then
+    warn "缺少 ${VENV_PKG}，正在安装..."
+    apt-get update -qq && apt-get install -y -qq "${VENV_PKG}"
+    info "${VENV_PKG} 已安装"
 fi
 
 # ---------------------------------------------------
