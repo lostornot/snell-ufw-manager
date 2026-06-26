@@ -229,16 +229,83 @@ else
     (( ERRORS++ ))
 fi
 
-# ─── Step 6: Ensure UFW logging ─────────────────────────────────────────────
+# ─── Step 6: Ensure UFW is installed, configured, and active ─────────────────
 
-section "6/7  Ensure UFW logging"
+section "6/7  Ensure UFW installation and status"
 
-if ufw logging on 2>/dev/null; then
-    step_ok "UFW logging enabled"
+# 1. Install UFW if missing
+if ! command -v ufw &>/dev/null; then
+    step_info "UFW is not installed. Installing ufw..."
+    if apt-get update -qq && apt-get install -y ufw; then
+        step_ok "UFW installed successfully"
+    else
+        step_fail "Failed to install UFW"
+        (( ERRORS++ ))
+    fi
+fi
+
+if command -v ufw &>/dev/null; then
+    # 2. Prevent SSH lockout: Detect SSH ports and allow them
+    local ssh_ports=("22")
+    
+    # Detect from sshd config
+    if [[ -f /etc/ssh/sshd_config ]]; then
+        local config_port
+        config_port=$(grep -i '^Port ' /etc/ssh/sshd_config | awk '{print $2}' || true)
+        if [[ -n "$config_port" ]]; then
+            ssh_ports+=("$config_port")
+        fi
+    fi
+    if [[ -d /etc/ssh/sshd_config.d ]]; then
+        local d_port
+        d_port=$(grep -rh -i '^Port ' /etc/ssh/sshd_config.d/ 2>/dev/null | awk '{print $2}' || true)
+        if [[ -n "$d_port" ]]; then
+            ssh_ports+=("$d_port")
+        fi
+    fi
+    # Detect from current SSH connection env
+    if [[ -n "${SSH_CONNECTION:-}" ]]; then
+        local conn_port
+        conn_port=$(echo "$SSH_CONNECTION" | awk '{print $4}')
+        if [[ -n "$conn_port" ]]; then
+            ssh_ports+=("$conn_port")
+        fi
+    fi
+
+    # Allow detected SSH ports
+    step_info "Ensuring SSH is allowed in UFW..."
+    ufw allow ssh &>/dev/null || true
+    for p in "${ssh_ports[@]}"; do
+        if [[ -n "$p" && "$p" =~ ^[0-9]+$ ]]; then
+            ufw allow "$p"/tcp &>/dev/null || true
+        fi
+    done
+
+    # 3. Enable UFW if inactive
+    if ufw status | grep -q "Status: active"; then
+        step_ok "UFW is already active"
+    else
+        step_info "Activating UFW..."
+        if ufw --force enable &>/dev/null; then
+            step_ok "UFW enabled and active"
+        else
+            step_fail "Failed to enable UFW"
+            (( ERRORS++ ))
+        fi
+    fi
+
+    # 4. Enable UFW logging
+    if ufw logging on &>/dev/null; then
+        step_ok "UFW logging enabled"
+    else
+        step_fail "Failed to enable UFW logging"
+        (( ERRORS++ ))
+    fi
 else
-    step_fail "Failed to enable UFW logging"
+    step_fail "UFW command still missing"
     (( ERRORS++ ))
 fi
+
 
 # ─── Step 7: Test snell-fwctl ────────────────────────────────────────────────
 

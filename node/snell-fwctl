@@ -82,7 +82,7 @@ cmd_list() {
     local first=true
     local ufw_output
 
-    ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status"
+    ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status: $ufw_output"
 
     while IFS= read -r line; do
         # Match lines like: [ 3] 28261/tcp  ALLOW IN  1.2.3.4
@@ -139,7 +139,7 @@ cmd_delete() {
     validate_port "$port"
 
     local ufw_output
-    ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status"
+    ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status: $ufw_output"
 
     # Collect matching rule numbers
     local -a rule_nums=()
@@ -303,7 +303,7 @@ cmd_sync() {
 
     # Step 2: Delete ALL existing rules for this port (highest first)
     local ufw_output
-    ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status"
+    ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status: $ufw_output"
 
     local -a existing_nums=()
     while IFS= read -r line; do

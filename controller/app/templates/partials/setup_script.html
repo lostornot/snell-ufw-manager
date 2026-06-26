@@ -59,10 +59,52 @@ mkdir -p /opt/snell-fwctl/backups
 chown -R snellmgr:snellmgr /opt/snell-fwctl
 echo "完成 ✓"
 
-# 6. 启用 UFW 日志
-echo -n "  启用 UFW 日志... "
-ufw logging on 2>/dev/null || true
-echo "完成 ✓"
+# 6. 配置并开启 UFW
+echo -n "  配置并开启 UFW... "
+if ! command -v ufw &>/dev/null; then
+    apt-get update -qq && apt-get install -y -qq ufw &>/dev/null || true
+fi
+if command -v ufw &>/dev/null; then
+    # Detect SSH ports
+    local ssh_ports=("22")
+    if [[ -f /etc/ssh/sshd_config ]]; then
+        local config_port
+        config_port=$(grep -i '^Port ' /etc/ssh/sshd_config | awk '{print $2}' || true)
+        if [[ -n "$config_port" ]]; then
+            ssh_ports+=("$config_port")
+        fi
+    fi
+    if [[ -d /etc/ssh/sshd_config.d ]]; then
+        local d_port
+        d_port=$(grep -rh -i '^Port ' /etc/ssh/sshd_config.d/ 2>/dev/null | awk '{print $2}' || true)
+        if [[ -n "$d_port" ]]; then
+            ssh_ports+=("$d_port")
+        fi
+    fi
+    if [[ -n "${SSH_CONNECTION:-}" ]]; then
+        local conn_port
+        conn_port=$(echo "$SSH_CONNECTION" | awk '{print $4}')
+        if [[ -n "$conn_port" ]]; then
+            ssh_ports+=("$conn_port")
+        fi
+    fi
+
+    # Allow SSH
+    ufw allow ssh &>/dev/null || true
+    for p in "${ssh_ports[@]}"; do
+        if [[ -n "$p" && "$p" =~ ^[0-9]+$ ]]; then
+            ufw allow "$p"/tcp &>/dev/null || true
+        fi
+    done
+
+    # Enable and log
+    ufw --force enable &>/dev/null || true
+    ufw logging on &>/dev/null || true
+    echo "完成 ✓"
+else
+    echo "失败 ✗ (未安装 UFW)"
+fi
+
 
 # 7. 测试
 echo -n "  测试 snell-fwctl... "
