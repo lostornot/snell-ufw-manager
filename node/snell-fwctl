@@ -241,13 +241,22 @@ cmd_candidates() {
     local cutoff
     cutoff=$(date -d "-${hours} hours" '+%s' 2>/dev/null) || cutoff=$(date -v-"${hours}"H '+%s' 2>/dev/null) || cutoff=0
 
-    # Combine log files
-    local logfiles="/var/log/ufw.log"
-    [[ -f /var/log/ufw.log.1 ]] && logfiles="/var/log/ufw.log.1 /var/log/ufw.log"
+    local current_year
+    current_year=$(date '+%Y')
+
+    # Gather log lines from both traditional syslog file and journalctl
+    get_logs() {
+        if [[ -f /var/log/ufw.log ]]; then
+            cat /var/log/ufw.log.1 /var/log/ufw.log 2>/dev/null || cat /var/log/ufw.log 2>/dev/null
+        fi
+        if command -v journalctl &>/dev/null; then
+            journalctl -k --since "${hours} hours ago" --no-pager 2>/dev/null | grep -E "UFW (BLOCK|ALLOW)" || true
+        fi
+    }
 
     # Use awk to parse, filter, and aggregate
     local candidates_json
-    candidates_json=$(awk -v port="$port" -v cutoff="$cutoff" '
+    candidates_json=$(get_logs | awk -v port="$port" -v cutoff="$cutoff" -v year="$current_year" '
     BEGIN {
         # Month name to number mapping
         m["Jan"]=1; m["Feb"]=2; m["Mar"]=3; m["Apr"]=4;
@@ -287,7 +296,7 @@ cmd_candidates() {
         day = $2
         split($3, t, ":")
         # Build ISO-ish timestamp for last_seen
-        ts = sprintf("2024-%02d-%02dT%s", mon, day, $3)
+        ts = sprintf("%d-%02d-%02dT%s", year, mon, day, $3)
 
         # Aggregate
         count[src]++
@@ -324,7 +333,7 @@ cmd_candidates() {
         }
         printf "]"
     }
-    ' $logfiles 2>/dev/null) || candidates_json="[]"
+    ' 2>/dev/null) || candidates_json="[]"
 
     json_ok "\"port\": ${port}, \"hours\": ${hours}, \"candidates\": ${candidates_json}"
 }

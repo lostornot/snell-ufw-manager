@@ -871,12 +871,14 @@ tbody tr:hover {
    ================================================================ */
 
 .htmx-indicator {
+  display: none;
   opacity: 0;
   transition: opacity 150ms ease-in;
 }
 
 .htmx-request .htmx-indicator,
 .htmx-request.htmx-indicator {
+  display: inline-block;
   opacity: 1;
 }
 
