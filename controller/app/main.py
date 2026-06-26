@@ -363,6 +363,109 @@ async def api_test_node(request: Request, node_id: int):
     )
 
 
+@app.get("/api/nodes/{node_id}/ping", response_class=HTMLResponse)
+async def api_ping_node(request: Request, node_id: int):
+    """Test SSH connection and return online/offline status dot."""
+    node = await db.get_node(node_id)
+    if not node:
+        return '<span class="status-dot offline" title="Node not found"></span>'
+    result = await ssh.test_connection(node)
+    if result.get("ok"):
+        return f'<span class="status-dot online" title="在线: {result.get("hostname", "")} (UFW {result.get("ufw_status", "")})"></span>'
+    else:
+        return f'<span class="status-dot offline" title="离线: {result.get("error", "unknown error")}"></span>'
+
+
+@app.post("/api/nodes/{node_id}/rules", response_class=HTMLResponse)
+async def api_add_node_rule(
+    request: Request,
+    node_id: int,
+    ip_cidr: str = Form(...),
+    port: int = Form(...),
+    proto: str = Form("both"),
+):
+    """Add a custom UFW rule on the node."""
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    
+    # Run add command on node
+    result = await ssh.run(node, f"add {ip_cidr.strip()} {port} {proto}")
+    
+    # Add operation log
+    success = result.get("ok", False)
+    detail = result.get("error", "") if not success else f"Added rule: from {ip_cidr} to port {port} ({proto})"
+    await db.add_op_log(node_id, node["name"], "ADD_RULE", f"{ip_cidr}:{port}", detail, success)
+    
+    # Fetch updated whitelist and return partial
+    live_result = await ssh.get_whitelist(node)
+    allowed_ips = await db.get_node_allowed_ips(node_id)
+    allowed_set = {ip["ip_cidr"] for ip in allowed_ips}
+    
+    # Render with toast trigger
+    toast = None
+    if not success:
+        toast = {"type": "error", "message": f"❌ 添加失败: {result.get('error', 'unknown error')}"}
+    else:
+        toast = {"type": "success", "message": f"✅ 已放行 {ip_cidr} 到端口 {port} ({proto.upper()})"}
+        
+    return templates.TemplateResponse(
+        "partials/whitelist.html",
+        {
+            "request": request,
+            "node": node,
+            "result": live_result,
+            "allowed_set": allowed_set,
+            "allowed_ips": allowed_ips,
+            "toast": toast,
+        },
+    )
+
+
+@app.delete("/api/nodes/{node_id}/rules/{num}", response_class=HTMLResponse)
+async def api_delete_node_rule(
+    request: Request,
+    node_id: int,
+    num: int,
+):
+    """Delete a UFW rule by number on the node."""
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+        
+    # Run delete_num command on node
+    result = await ssh.run(node, f"delete_num {num}")
+    
+    # Add operation log
+    success = result.get("ok", False)
+    detail = result.get("error", "") if not success else f"Deleted rule #{num}"
+    await db.add_op_log(node_id, node["name"], "DELETE_RULE", f"Rule #{num}", detail, success)
+    
+    # Fetch updated whitelist and return partial
+    live_result = await ssh.get_whitelist(node)
+    allowed_ips = await db.get_node_allowed_ips(node_id)
+    allowed_set = {ip["ip_cidr"] for ip in allowed_ips}
+    
+    toast = None
+    if not success:
+        toast = {"type": "error", "message": f"❌ 删除失败: {result.get('error', 'unknown error')}"}
+    else:
+        toast = {"type": "success", "message": f"✅ 已成功删除规则 #{num}"}
+        
+    return templates.TemplateResponse(
+        "partials/whitelist.html",
+        {
+            "request": request,
+            "node": node,
+            "result": live_result,
+            "allowed_set": allowed_set,
+            "allowed_ips": allowed_ips,
+            "toast": toast,
+        },
+    )
+
+
+
 @app.post("/api/nodes/{node_id}/sync", response_class=HTMLResponse)
 async def api_sync_node(request: Request, node_id: int):
     """Sync whitelist: push all allowed IPs (from relay groups) to the node."""

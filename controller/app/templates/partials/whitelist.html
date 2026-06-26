@@ -1,53 +1,107 @@
 <!-- Whitelist partial: live UFW rules from node -->
+{% if toast %}
+<div class="toast-trigger hidden"
+     data-message="{{ toast.message }}"
+     data-type="{{ toast.type | default('success') }}">
+</div>
+{% endif %}
+
 {% if result and result.ok %}
   {% set rules = result.rules | default([]) %}
-  {% set unique_ips = [] %}
-  {% for rule in rules %}
-    {% if rule.ip not in unique_ips %}
-      {% if unique_ips.append(rule.ip) %}{% endif %}
-    {% endif %}
-  {% endfor %}
 
   {% if rules %}
-  <div class="table-wrap">
+  <div class="table-wrap mb-3">
     <table>
       <thead>
         <tr>
-          <th>IP / CIDR</th>
-          <th>协议</th>
-          <th>状态</th>
+          <th style="width: 70px;"># ID</th>
+          <th style="width: 100px;">目标端口</th>
+          <th style="width: 90px;">协议</th>
+          <th>来源地址 (From)</th>
+          <th>规则类型</th>
+          <th style="width: 80px; text-align: right;">操作</th>
         </tr>
       </thead>
       <tbody>
-        {% for ip in unique_ips %}
-        {% set in_db = ip in allowed_set %}
-        <tr class="{% if not in_db %}drift-row{% endif %}">
-          <td class="mono">{{ ip }}</td>
-          <td>
-            {% set protos = [] %}
-            {% for rule in rules if rule.ip == ip %}
-              {% if protos.append(rule.proto) %}{% endif %}
-            {% endfor %}
-            {{ protos | join(' + ') }}
-          </td>
-          <td>
-            {% if in_db %}
-              <span class="tag tag-allow">✓ 在白名单</span>
-            {% else %}
-              <span class="tag tag-warn">⚠ 漂移规则</span>
-            {% endif %}
-          </td>
-        </tr>
+        {% for rule in rules %}
+          {% set is_snell = (rule.port | string == node.snell_port | string) %}
+          {% set is_ssh = (rule.port | string == node.ssh_port | string or rule.port | string == '22') %}
+          {% set in_db = (is_snell and rule.ip in allowed_set) %}
+          
+          <tr class="{% if is_snell and not in_db %}drift-row{% endif %}">
+            <td class="text-secondary mono">[{{ rule.num }}]</td>
+            <td>
+              <span class="tag tag-info mono" style="font-weight: bold; background: var(--accent-bg); color: var(--accent-text);">{{ rule.port }}</span>
+            </td>
+            <td>
+              <span class="mono text-secondary text-sm">{{ rule.proto | upper }}</span>
+            </td>
+            <td class="mono font-semibold">{{ rule.ip }}</td>
+            <td>
+              {% if is_snell %}
+                {% if in_db %}
+                  <span class="tag tag-allow">✓ Snell 代理 (已授权)</span>
+                {% else %}
+                  <span class="tag tag-warn">⚠️ Snell 代理 (未授权漂移)</span>
+                {% endif %}
+              {% elif is_ssh %}
+                <span class="tag tag-info">🔒 SSH 登录服务</span>
+              {% else %}
+                <span class="tag" style="background: var(--bg-inset); color: var(--text-secondary);">⚙️ 自定义规则</span>
+              {% endif %}
+            </td>
+            <td style="text-align: right;">
+              <button class="btn btn-danger btn-sm"
+                      hx-delete="/api/nodes/{{ node.id }}/rules/{{ rule.num }}"
+                      hx-target="#live-whitelist"
+                      hx-swap="innerHTML"
+                      hx-confirm="确定要删除 UFW 规则 #{{ rule.num }} 吗？">
+                删除
+              </button>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-  <p class="text-secondary text-sm mt-2">共 {{ rules | length }} 条规则，{{ unique_ips | length }} 个 IP</p>
   {% else %}
-  <div class="empty-state">
-    <p>该端口暂无 UFW 白名单规则</p>
+  <div class="empty-state mb-3">
+    <p>该节点暂无 UFW 规则</p>
   </div>
   {% endif %}
+
+  <!-- Add Rule Form -->
+  <div class="card" style="background: var(--bg-inset); border: 1px dashed var(--border-default); padding: 16px; border-radius: var(--radius-md); margin-top: 16px;">
+    <div style="font-weight: bold; margin-bottom: 12px; font-size: 14px; display: flex; align-items: center; gap: 6px;">
+      <span>➕</span> 新增 UFW 放行规则
+    </div>
+    <form class="form-inline"
+          hx-post="/api/nodes/{{ node.id }}/rules"
+          hx-target="#live-whitelist"
+          hx-swap="innerHTML"
+          style="margin-bottom: 0;">
+      <div class="form-group" style="flex: 2;">
+        <label class="form-label text-xs" style="margin-bottom: 4px;">来源 IP / CIDR *</label>
+        <input class="form-input form-input-sm mono" name="ip_cidr" placeholder="如 1.2.3.4 或 any" required>
+      </div>
+      <div class="form-group" style="flex: 1.2;">
+        <label class="form-label text-xs" style="margin-bottom: 4px;">放行端口 *</label>
+        <input class="form-input form-input-sm mono" name="port" type="number" placeholder="如 23" required>
+      </div>
+      <div class="form-group" style="flex: 1;">
+        <label class="form-label text-xs" style="margin-bottom: 4px;">协议</label>
+        <select class="form-input form-input-sm" name="proto" style="padding: 4px 8px; height: 32px;">
+          <option value="both">TCP + UDP</option>
+          <option value="tcp">TCP</option>
+          <option value="udp">UDP</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary btn-sm" style="margin-top: 18px; height: 32px;">
+        <span class="spinner htmx-indicator"></span>
+        添加规则
+      </button>
+    </form>
+  </div>
 
 {% elif result %}
   <div class="empty-state" style="color:var(--error);">

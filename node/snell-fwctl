@@ -57,6 +57,9 @@ validate_cidr() {
 
 validate_ip_cidr() {
     local input="$1"
+    if [[ "$input" == "any" || "$input" == "anywhere" ]]; then
+        return 0
+    fi
     if ! validate_cidr "$input"; then
         json_err "invalid ip/cidr: $input"
     fi
@@ -72,11 +75,10 @@ validate_port() {
 # ─── Command: list ───────────────────────────────────────────────────────────
 
 cmd_list() {
-    local port="${1:-}"
-    if [[ -z "$port" ]]; then
-        json_err "usage: snell-fwctl list <port>"
+    local filter_port="${1:-all}"
+    if [[ "$filter_port" != "all" ]]; then
+        validate_port "$filter_port"
     fi
-    validate_port "$port"
 
     local rules_json="["
     local first=true
@@ -85,25 +87,43 @@ cmd_list() {
     ufw_output=$(ufw status numbered 2>&1) || json_err "failed to get ufw status: $ufw_output"
 
     while IFS= read -r line; do
-        # Match lines like: [ 3] 28261/tcp  ALLOW IN  1.2.3.4
-        # or: [ 3] 28261/udp  ALLOW IN  1.2.3.0/24
-        if [[ "$line" =~ ^\[\ *([0-9]+)\]\ +${port}/(tcp|udp)\ +ALLOW\ +IN\ +(.+)$ ]]; then
+        if [[ "$line" =~ ^\[\ *([0-9]+)\]\ +([^ ]+)\ +(ALLOW|DENY|LIMIT|ALLOW\ IN|ALLOW\ OUT|DENY\ IN|DENY\ OUT)\ +(.+)$ ]]; then
             local num="${BASH_REMATCH[1]}"
-            local proto="${BASH_REMATCH[2]}"
+            local target="${BASH_REMATCH[2]}"
+            local action="${BASH_REMATCH[3]}"
             local ip
-            ip=$(echo "${BASH_REMATCH[3]}" | xargs)  # trim whitespace
+            ip=$(echo "${BASH_REMATCH[4]}" | xargs)
+
+            # Strip (v6) case-insensitively
+            target=$(echo "$target" | sed 's/ *(v6)//i')
+            ip=$(echo "$ip" | sed 's/ *(v6)//i')
+
+            # Split target into port and proto
+            local r_port="$target"
+            local r_proto="all"
+            if [[ "$target" == */* ]]; then
+                r_port="${target%/*}"
+                r_proto="${target#*/}"
+            fi
+
+            # Apply port filter if requested
+            if [[ "$filter_port" != "all" ]]; then
+                if [[ "$r_port" != "$filter_port" ]]; then
+                    continue
+                fi
+            fi
 
             if [[ "$first" == true ]]; then
                 first=false
             else
                 rules_json+=","
             fi
-            rules_json+="{\"num\": ${num}, \"ip\": \"${ip}\", \"proto\": \"${proto}\", \"action\": \"ALLOW\"}"
+            rules_json+="{\"num\": ${num}, \"ip\": \"${ip}\", \"port\": \"${r_port}\", \"proto\": \"${r_proto}\", \"action\": \"${action}\"}"
         fi
     done <<< "$ufw_output"
 
     rules_json+="]"
-    json_ok "\"port\": ${port}, \"rules\": ${rules_json}"
+    json_ok "\"port\": \"${filter_port}\", \"rules\": ${rules_json}"
 }
 
 # ─── Command: add ────────────────────────────────────────────────────────────
@@ -111,20 +131,37 @@ cmd_list() {
 cmd_add() {
     local ip="${1:-}"
     local port="${2:-}"
+    local proto="${3:-both}"
     if [[ -z "$ip" || -z "$port" ]]; then
-        json_err "usage: snell-fwctl add <ip_cidr> <port>"
+        json_err "usage: snell-fwctl add <ip_cidr> <port> [tcp|udp|both]"
     fi
     validate_ip_cidr "$ip"
     validate_port "$port"
 
-    ufw allow from "$ip" to any port "$port" proto tcp >/dev/null 2>&1 \
-        || json_err "failed to add tcp rule for $ip on port $port"
-    ufw allow from "$ip" to any port "$port" proto udp >/dev/null 2>&1 \
-        || json_err "failed to add udp rule for $ip on port $port"
-    ufw reload >/dev/null 2>&1 \
-        || json_err "failed to reload ufw"
+    local from_clause="from $ip"
+    if [[ "$ip" == "any" || "$ip" == "anywhere" ]]; then
+        from_clause="any"
+    fi
 
-    json_ok "\"added\": \"${ip}\", \"port\": ${port}"
+    if [[ "$proto" == "tcp" || "$proto" == "both" ]]; then
+        if [[ "$from_clause" == "any" ]]; then
+            ufw allow "$port"/tcp >/dev/null 2>&1 || json_err "failed to add tcp rule"
+        else
+            ufw allow from "$ip" to any port "$port" proto tcp >/dev/null 2>&1 \
+                || json_err "failed to add tcp rule for $ip on port $port"
+        fi
+    fi
+    if [[ "$proto" == "udp" || "$proto" == "both" ]]; then
+        if [[ "$from_clause" == "any" ]]; then
+            ufw allow "$port"/udp >/dev/null 2>&1 || json_err "failed to add udp rule"
+        else
+            ufw allow from "$ip" to any port "$port" proto udp >/dev/null 2>&1 \
+                || json_err "failed to add udp rule for $ip on port $port"
+        fi
+    fi
+    ufw reload >/dev/null 2>&1 || json_err "failed to reload ufw"
+
+    json_ok "\"added\": \"${ip}\", \"port\": ${port}, \"proto\": \"${proto}\""
 }
 
 # ─── Command: delete ─────────────────────────────────────────────────────────
@@ -147,6 +184,7 @@ cmd_delete() {
         if [[ "$line" =~ ^\[\ *([0-9]+)\]\ +${port}/(tcp|udp)\ +ALLOW\ +IN\ +(.+)$ ]]; then
             local rule_ip
             rule_ip=$(echo "${BASH_REMATCH[3]}" | xargs)
+            rule_ip=$(echo "$rule_ip" | sed 's/ *(v6)//i')
             if [[ "$rule_ip" == "$ip" ]]; then
                 rule_nums+=("${BASH_REMATCH[1]}")
             fi
@@ -170,6 +208,21 @@ cmd_delete() {
     ufw reload >/dev/null 2>&1 || json_err "failed to reload ufw"
 
     json_ok "\"deleted\": \"${ip}\", \"port\": ${port}, \"rules_removed\": ${count}"
+}
+
+cmd_delete_num() {
+    local num="${1:-}"
+    if [[ -z "$num" ]]; then
+        json_err "usage: snell-fwctl delete_num <rule_number>"
+    fi
+    if [[ ! "$num" =~ ^[0-9]+$ ]]; then
+        json_err "invalid rule number: $num"
+    fi
+
+    echo y | ufw delete "$num" >/dev/null 2>&1 || json_err "failed to delete rule number $num"
+    ufw reload >/dev/null 2>&1 || json_err "failed to reload ufw"
+
+    json_ok "\"deleted_num\": ${num}"
 }
 
 # ─── Command: candidates ─────────────────────────────────────────────────────
@@ -514,6 +567,7 @@ main() {
         list)       cmd_list "$@" ;;
         add)        cmd_add "$@" ;;
         delete)     cmd_delete "$@" ;;
+        delete_num) cmd_delete_num "$@" ;;
         candidates) cmd_candidates "$@" ;;
         sync)       cmd_sync "$@" ;;
         backup)     cmd_backup "$@" ;;
@@ -521,7 +575,7 @@ main() {
         backups)    cmd_backups "$@" ;;
         port)       cmd_port "$@" ;;
         status)     cmd_status "$@" ;;
-        "")         json_err "usage: snell-fwctl <command> [args...]\ncommands: list, add, delete, candidates, sync, backup, restore, backups, port, status" ;;
+        "")         json_err "usage: snell-fwctl <command> [args...]\ncommands: list, add, delete, delete_num, candidates, sync, backup, restore, backups, port, status" ;;
         *)          json_err "unknown command: $cmd" ;;
     esac
 }

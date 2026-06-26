@@ -74,8 +74,8 @@ class SSHExecutor:
         return await self.run(node, "status")
 
     async def get_whitelist(self, node: dict) -> dict:
-        """Get current UFW whitelist rules for the Snell port."""
-        return await self.run(node, f"list {node['snell_port']}")
+        """Get all current UFW rules on the node."""
+        return await self.run(node, "list all")
 
     async def sync_whitelist(self, node: dict, ips: list[str]) -> dict:
         """Full-sync whitelist: rebuild rules to match the given IP list."""

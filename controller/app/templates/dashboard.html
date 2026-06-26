@@ -14,7 +14,10 @@
   <a href="/nodes/{{ node.id }}" style="text-decoration:none;color:inherit;">
     <div class="node-card">
       <div class="node-card-header">
-        <span class="status-dot unknown" id="status-dot-{{ node.id }}"></span>
+        <span class="status-dot unknown"
+              hx-get="/api/nodes/{{ node.id }}/ping"
+              hx-trigger="load"
+              hx-swap="outerHTML"></span>
         <span class="node-card-name">{{ node.name }}</span>
       </div>
       <div class="node-card-meta">

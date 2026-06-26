@@ -10,7 +10,10 @@
 <div class="node-header">
   <div class="node-header-info">
     <h1>
-      <span class="status-dot unknown"></span>
+      <span class="status-dot unknown"
+            hx-get="/api/nodes/{{ node.id }}/ping"
+            hx-trigger="load"
+            hx-swap="outerHTML"></span>
       {{ node.name }}
     </h1>
     <div class="node-header-badges">
