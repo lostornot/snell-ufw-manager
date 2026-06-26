@@ -923,14 +923,59 @@ mkdir -p /opt/snell-fwctl/backups
 chown -R snellmgr:snellmgr /opt/snell-fwctl
 echo "完成 ✓"
 
-# 6. Enable UFW logging
-echo -n "  启用 UFW 日志... "
-ufw logging on 2>/dev/null || true
-echo "完成 ✓"
+# 6. Ensure UFW is installed, configured, and active
+echo "  配置 UFW 防火墙... "
+if ! command -v ufw &>/dev/null; then
+    echo "    未检测到 UFW，正在安装... "
+    apt-get update -qq && apt-get install -y ufw >/dev/null
+    echo "    UFW 安装完成 ✓"
+fi
+
+if command -v ufw &>/dev/null; then
+    # Detect SSH ports to prevent lockouts
+    ssh_ports=("22")
+    if [ -f /etc/ssh/sshd_config ]; then
+        config_port=$(grep -i '^Port ' /etc/ssh/sshd_config | awk '{{print $2}}' || true)
+        if [ -n "$config_port" ]; then
+            ssh_ports+=("$config_port")
+        fi
+    fi
+    if [ -d /etc/ssh/sshd_config.d ]; then
+        d_port=$(grep -rh -i '^Port ' /etc/ssh/sshd_config.d/ 2>/dev/null | awk '{{print $2}}' || true)
+        if [ -n "$d_port" ]; then
+            ssh_ports+=("$d_port")
+        fi
+    fi
+    if [ -n "${{SSH_CONNECTION:-}}" ]; then
+        conn_port=$(echo "$SSH_CONNECTION" | awk '{{print $4}}')
+        if [ -n "$conn_port" ]; then
+            ssh_ports+=("$conn_port")
+        fi
+    fi
+
+    # Allow detected SSH ports
+    ufw allow ssh &>/dev/null || true
+    for p in "${{ssh_ports[@]}}"; do
+        if [ -n "$p" ] && [[ "$p" =~ ^[0-9]+$ ]]; then
+            ufw allow "$p"/tcp &>/dev/null || true
+        fi
+    done
+
+    # Enable UFW if inactive
+    if ! ufw status | grep -q "Status: active"; then
+        ufw --force enable &>/dev/null
+    fi
+
+    # Enable logging
+    ufw logging on &>/dev/null || true
+    echo "    UFW 已启用并配置安全规则 ✓"
+else
+    echo "    ⚠️ 警告：无法安装或找到 UFW，请手动安装！"
+fi
 
 # 7. Test
 echo -n "  测试 snell-fwctl... "
-RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/snell-fwctl status 2>&1)
+RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/snell-fwctl status 2>&1) || true
 if echo "$RESULT" | grep -q '"ok":true'; then
     echo "通过 ✓"
 else
