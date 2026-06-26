@@ -665,10 +665,12 @@ async def render_single_port_card(request: Request, node: dict, port: int, toast
         "rules": port_rules
     }
 
-    return templates.TemplateResponse(
+    resp = templates.TemplateResponse(
         "partials/port_card.html",
         {"request": request, "node": node, "data": data, "toast": toast},
     )
+    resp.headers["HX-Trigger"] = "rules-updated"
+    return resp
 
 
 # ---------------------------------------------------------------------------

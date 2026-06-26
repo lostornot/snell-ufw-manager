@@ -17,27 +17,27 @@
     <table>
       <thead>
         <tr>
-          <th>操作时间</th>
-          <th>节点名称</th>
-          <th>操作类型</th>
-          <th>操作目标</th>
+          <th style="white-space: nowrap;">操作时间</th>
+          <th style="white-space: nowrap;">节点名称</th>
+          <th style="white-space: nowrap;">操作类型</th>
+          <th style="white-space: nowrap;">操作目标</th>
           <th>详情描述</th>
-          <th>操作状态</th>
+          <th style="white-space: nowrap;">操作状态</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
         <tr>
-          <td class="text-secondary text-sm mono" style="font-size: 0.85rem; color: var(--text-secondary);">{{ log.created_at }}</td>
-          <td style="font-weight: 600;">{{ log.node_name or '—' }}</td>
-          <td><span class="tag tag-info" style="font-size: 0.72rem; padding: 2px 8px;">{{ log.action }}</span></td>
-          <td class="mono" style="font-size: 0.85rem; color: var(--accent-purple);">{{ log.target or '—' }}</td>
-          <td style="color: var(--text-secondary);">{{ log.detail or '—' }}</td>
-          <td>
+          <td class="text-secondary text-sm mono" style="font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap;">{{ log.created_at }}</td>
+          <td style="font-weight: 600; white-space: nowrap;">{{ log.node_name or '—' }}</td>
+          <td style="white-space: nowrap;"><span class="tag tag-info" style="font-size: 0.72rem; padding: 2px 8px; white-space: nowrap;">{{ log.action }}</span></td>
+          <td class="mono" style="font-size: 0.85rem; color: var(--accent-purple); white-space: nowrap;">{{ log.target or '—' }}</td>
+          <td>{{ log.detail or '—' }}</td>
+          <td style="white-space: nowrap;">
             {% if log.success %}
-              <span class="tag tag-allow" style="font-size: 0.72rem; padding: 2px 8px;">✓ 成功</span>
+              <span class="tag tag-allow" style="font-size: 0.72rem; padding: 2px 8px; white-space: nowrap;">✓ 成功</span>
             {% else %}
-              <span class="tag tag-block" style="font-size: 0.72rem; padding: 2px 8px;">✗ 失败</span>
+              <span class="tag tag-block" style="font-size: 0.72rem; padding: 2px 8px; white-space: nowrap;">✗ 失败</span>
             {% endif %}
           </td>
         </tr>
