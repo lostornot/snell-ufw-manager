@@ -24,7 +24,7 @@
         <span class="tag tag-info mono">连接地址: {{ node.host }}:{{ node.ssh_port }}</span>
         <span class="tag tag-info">默认 SNELL 端口: {{ node.snell_port }}</span>
         {% if node.remark %}
-        <span class="tag" style="background: rgba(15, 23, 42, 0.04); color: var(--text-secondary);">备注: {{ node.remark }}</span>
+        <span class="tag tag-default">备注: {{ node.remark }}</span>
         {% endif %}
       </div>
     </div>

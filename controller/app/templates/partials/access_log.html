@@ -19,7 +19,7 @@
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
           <td class="mono" style="white-space: nowrap;">{{ c.ip }}</td>
-          <td class="mono" style="white-space: nowrap;"><span class="tag tag-info" style="background:var(--accent-blue-trans);color:var(--accent-blue);padding:2px 6px;border-radius:4px;font-size:0.8rem;white-space: nowrap;">{{ node.snell_port }}</span></td>
+          <td class="mono" style="white-space: nowrap;"><span class="tag tag-info" style="font-size:0.8rem; padding:2px 6px; border-radius:4px;">{{ node.snell_port }}</span></td>
           <td style="white-space: nowrap;">
             {% if c.action == "ALLOW" %}
               <span class="tag tag-allow" style="white-space: nowrap;">✅ 允许</span>
