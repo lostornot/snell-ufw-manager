@@ -262,11 +262,11 @@ h1, h2, h3, h4, .font-outfit {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
-  align-items: center;
-  min-height: 80px;
+  align-items: flex-start;
+  min-height: 96px;
   height: 100%;
   flex-grow: 1;
-  padding: 12px 16px !important;
+  padding: 16px 20px !important;
 }
 
 .node-card-header {
