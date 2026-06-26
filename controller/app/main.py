@@ -658,13 +658,14 @@ async def api_discover_node(
     request: Request,
     host: str = Form(...),
     ssh_port: int = Form(22),
+    snell_port: int | None = Form(None),
 ):
-    """Auto-discover a node: SSH in, detect hostname + snell port, create node."""
+    """Auto-discover a node: SSH in, detect hostname + snell port (if not specified), create node."""
     node_stub = {
         "host": host.strip(),
         "ssh_port": ssh_port,
         "ssh_user": "snellmgr",
-        "snell_port": 0,
+        "snell_port": snell_port or 0,
     }
 
     # Test SSH connection
@@ -675,10 +676,13 @@ async def api_discover_node(
             {"request": request, "toast": {"type": "error", "message": f"❌ SSH 连接失败: {status.get('error', 'unknown')}"}},
         )
 
-    # Detect snell port
-    node_stub["snell_conf"] = config.snell.default_conf_path
-    port_result = await ssh.get_snell_port(node_stub)
-    snell_port = port_result.get("port", 28261) if port_result.get("ok") else 28261
+    # Use the provided port or auto-detect it
+    if snell_port is not None and snell_port > 0:
+        final_snell_port = snell_port
+    else:
+        node_stub["snell_conf"] = config.snell.default_conf_path
+        port_result = await ssh.get_snell_port(node_stub)
+        final_snell_port = port_result.get("port", 28261) if port_result.get("ok") else 28261
 
     hostname = status.get("hostname", host.strip())
 
@@ -688,10 +692,10 @@ async def api_discover_node(
         host=host.strip(),
         ssh_port=ssh_port,
         ssh_user="snellmgr",
-        snell_port=snell_port,
+        snell_port=final_snell_port,
         snell_conf=config.snell.default_conf_path,
     )
-    await db.add_op_log(node_id, hostname, "DISCOVER", host.strip(), f"Auto: port={snell_port}")
+    await db.add_op_log(node_id, hostname, "DISCOVER", host.strip(), f"Auto: port={final_snell_port}")
 
     nodes = await db.get_all_nodes()
     pubkey = ssh.get_public_key()
@@ -704,9 +708,34 @@ async def api_discover_node(
             "pubkey": pubkey,
             "ctrl_ip": ctrl_ip,
             "default_snell_conf": config.snell.default_conf_path,
-            "toast": {"type": "success", "message": f"✅ 已发现并添加: {hostname} (Snell:{snell_port})"},
+            "toast": {"type": "success", "message": f"✅ 已发现并添加: {hostname} (Snell:{final_snell_port})"},
         },
     )
+
+
+@app.get("/partials/nodes/{node_id}/row", response_class=HTMLResponse)
+async def partial_node_row(request: Request, node_id: int):
+    """Return the normal table row for a node."""
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return templates.TemplateResponse(
+        "partials/node_row.html",
+        {"request": request, "node": node},
+    )
+
+
+@app.get("/partials/nodes/{node_id}/edit", response_class=HTMLResponse)
+async def partial_node_edit(request: Request, node_id: int):
+    """Return the edit table row for a node."""
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return templates.TemplateResponse(
+        "partials/node_edit_row.html",
+        {"request": request, "node": node},
+    )
+
 
 
 # ---------------------------------------------------------------------------

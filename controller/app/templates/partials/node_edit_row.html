@@ -1,0 +1,37 @@
+<tr id="node-row-{{ node.id }}" class="editing-row">
+  <td>
+    <input class="form-input form-input-sm" name="name" value="{{ node.name }}" required style="font-weight: bold; width: 100px;">
+  </td>
+  <td>
+    <input class="form-input form-input-sm mono" name="host" value="{{ node.host }}" required style="width: 130px;">
+  </td>
+  <td>
+    <input class="form-input form-input-sm mono" name="ssh_port" type="number" value="{{ node.ssh_port }}" required style="width: 70px;">
+  </td>
+  <td>
+    <input class="form-input form-input-sm mono" name="snell_port" type="number" value="{{ node.snell_port }}" required style="width: 90px;">
+  </td>
+  <td>
+    <input class="form-input form-input-sm" name="remark" value="{{ node.remark or '' }}" placeholder="备注" style="width: 120px;">
+    <input type="hidden" name="ssh_user" value="{{ node.ssh_user }}">
+    <input type="hidden" name="snell_conf" value="{{ node.snell_conf }}">
+  </td>
+  <td>
+    <div class="flex gap-2">
+      <button class="btn btn-primary btn-sm"
+              hx-put="/api/nodes/{{ node.id }}"
+              hx-include="closest tr"
+              hx-target="#node-manage-list"
+              hx-swap="outerHTML">
+        <span class="spinner htmx-indicator"></span>
+        💾 保存
+      </button>
+      <button type="button" class="btn btn-secondary btn-sm"
+              hx-get="/partials/nodes/{{ node.id }}/row"
+              hx-target="#node-row-{{ node.id }}"
+              hx-swap="outerHTML">
+        ❌ 取消
+      </button>
+    </div>
+  </td>
+</tr>

@@ -1,0 +1,32 @@
+<tr id="node-row-{{ node.id }}">
+  <td><strong>{{ node.name }}</strong></td>
+  <td class="mono">{{ node.host }}</td>
+  <td class="mono">{{ node.ssh_port }}</td>
+  <td class="mono">{{ node.snell_port }}</td>
+  <td class="text-secondary">{{ node.remark or '—' }}</td>
+  <td>
+    <div class="flex gap-2" style="align-items: center;">
+      <a href="/nodes/{{ node.id }}" class="btn btn-secondary btn-sm">管理 →</a>
+      <button class="btn btn-secondary btn-sm"
+              hx-post="/api/nodes/{{ node.id }}/test"
+              hx-target="#toast-container"
+              hx-swap="beforeend">
+        <span class="spinner htmx-indicator"></span>
+        🔗 测试
+      </button>
+      <button class="btn btn-secondary btn-sm"
+              hx-get="/partials/nodes/{{ node.id }}/edit"
+              hx-target="#node-row-{{ node.id }}"
+              hx-swap="outerHTML">
+        ✏️ 编辑
+      </button>
+      <button class="btn btn-danger btn-sm"
+              hx-delete="/api/nodes/{{ node.id }}"
+              hx-target="#node-manage-list"
+              hx-swap="outerHTML"
+              hx-confirm="确定删除节点 {{ node.name }}？">
+        删除
+      </button>
+    </div>
+  </td>
+</tr>
