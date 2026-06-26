@@ -8,12 +8,63 @@
   <span class="icon">🖥️</span> 节点管理
 </div>
 
-<!-- Add Node Form -->
+<!-- Step 1: Setup Script -->
 <div class="card mb-3">
-  <div class="card-title mb-2"><span>➕</span> 添加节点</div>
-  <form hx-post="/api/nodes"
+  <div class="card-header">
+    <div class="card-title"><span>📜</span> 第一步：初始化落地节点</div>
+    <button class="btn btn-secondary btn-sm"
+            hx-get="/partials/setup-script"
+            hx-target="#setup-script-area"
+            hx-swap="innerHTML">
+      <span class="spinner htmx-indicator"></span>
+      🔑 生成初始化脚本
+    </button>
+  </div>
+  <p class="text-secondary text-sm mb-3">
+    在落地 VPS 上以 <strong>root</strong> 运行初始化脚本（创建 snellmgr 用户 + 部署 snell-fwctl + 配置 SSH 密钥）。
+    完成后回到第二步添加节点。
+  </p>
+  <div id="setup-script-area">
+    <p class="text-secondary text-sm">点击右上角「生成初始化脚本」查看可复制的脚本</p>
+  </div>
+</div>
+
+<!-- Step 2: Discover Node -->
+<div class="card mb-3">
+  <div class="card-header">
+    <div class="card-title"><span>🔍</span> 第二步：发现并添加节点</div>
+  </div>
+  <p class="text-secondary text-sm mb-2">
+    输入落地 VPS 的 IP，自动检测主机名和 Snell 端口。
+  </p>
+  <form class="form-inline"
+        hx-post="/api/nodes/discover"
         hx-target="#node-manage-list"
         hx-swap="outerHTML">
+    <div class="form-group" style="flex:3;">
+      <label class="form-label">节点 IP *</label>
+      <input class="form-input" name="host" placeholder="1.2.3.4" required>
+    </div>
+    <div class="form-group" style="flex:1;">
+      <label class="form-label">SSH 端口</label>
+      <input class="form-input" name="ssh_port" type="number" value="22">
+    </div>
+    <button type="submit" class="btn btn-primary" style="margin-top:18px;">
+      <span class="spinner htmx-indicator"></span>
+      🔍 发现并添加
+    </button>
+  </form>
+</div>
+
+<!-- Manual Add (collapsible) -->
+<details class="card mb-3">
+  <summary class="card-title" style="cursor:pointer;padding:4px 0;">
+    <span>✏️</span> 手动添加节点（高级）
+  </summary>
+  <form hx-post="/api/nodes"
+        hx-target="#node-manage-list"
+        hx-swap="outerHTML"
+        style="margin-top:12px;">
     <div class="form-row">
       <div class="form-group">
         <label class="form-label">名称 *</label>
@@ -46,14 +97,14 @@
       <label class="form-label">备注</label>
       <input class="form-input" name="remark" placeholder="可选备注">
     </div>
-    <button type="submit" class="btn btn-primary">
+    <button type="submit" class="btn btn-secondary">
       <span class="spinner htmx-indicator"></span>
       添加节点
     </button>
   </form>
-</div>
+</details>
 
-<!-- Node List + Setup Script -->
+<!-- Node List -->
 <div id="node-manage-list">
   {% include "partials/node_manage_list.html" %}
 </div>

@@ -649,6 +649,67 @@ async def api_sync_relay_group(request: Request, group_id: int):
 
 
 # ---------------------------------------------------------------------------
+# API: Auto-discover node
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/nodes/discover", response_class=HTMLResponse)
+async def api_discover_node(
+    request: Request,
+    host: str = Form(...),
+    ssh_port: int = Form(22),
+):
+    """Auto-discover a node: SSH in, detect hostname + snell port, create node."""
+    node_stub = {
+        "host": host.strip(),
+        "ssh_port": ssh_port,
+        "ssh_user": "snellmgr",
+        "snell_port": 0,
+    }
+
+    # Test SSH connection
+    status = await ssh.test_connection(node_stub)
+    if not status.get("ok"):
+        return templates.TemplateResponse(
+            "partials/toast.html",
+            {"request": request, "toast": {"type": "error", "message": f"❌ SSH 连接失败: {status.get('error', 'unknown')}"}},
+        )
+
+    # Detect snell port
+    node_stub["snell_conf"] = config.snell.default_conf_path
+    port_result = await ssh.get_snell_port(node_stub)
+    snell_port = port_result.get("port", 28261) if port_result.get("ok") else 28261
+
+    hostname = status.get("hostname", host.strip())
+
+    # Create node
+    node_id = await db.create_node(
+        name=hostname,
+        host=host.strip(),
+        ssh_port=ssh_port,
+        ssh_user="snellmgr",
+        snell_port=snell_port,
+        snell_conf=config.snell.default_conf_path,
+    )
+    await db.add_op_log(node_id, hostname, "DISCOVER", host.strip(), f"Auto: port={snell_port}")
+
+    nodes = await db.get_all_nodes()
+    pubkey = ssh.get_public_key()
+    ctrl_ip = ssh.get_controller_ip()
+    return templates.TemplateResponse(
+        "partials/node_manage_list.html",
+        {
+            "request": request,
+            "nodes": nodes,
+            "pubkey": pubkey,
+            "ctrl_ip": ctrl_ip,
+            "default_snell_conf": config.snell.default_conf_path,
+            "toast": {"type": "success", "message": f"✅ 已发现并添加: {hostname} (Snell:{snell_port})"},
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
 # API: Setup script generation
 # ---------------------------------------------------------------------------
 
@@ -741,10 +802,27 @@ fi
 echo ""
 echo "══════════════════════════════════════════"
 echo " ✅ 节点初始化完成"
-echo " 请回到控制面板点击「测试连接」"
+echo " 请回到控制面板，输入本机 IP 点击「发现并添加」"
 echo "══════════════════════════════════════════"
 """
     return script
+
+
+@app.get("/partials/setup-script", response_class=HTMLResponse)
+async def partial_setup_script(request: Request):
+    """Return the setup script in a copyable HTML code block."""
+    pubkey = ssh.get_public_key()
+    ctrl_ip = ssh.get_controller_ip()
+    fwctl_path = NODE_DIR / "snell-fwctl"
+    try:
+        fwctl_content = fwctl_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        fwctl_content = "# snell-fwctl not found"
+
+    return templates.TemplateResponse(
+        "partials/setup_script.html",
+        {"request": request, "pubkey": pubkey, "ctrl_ip": ctrl_ip, "fwctl_content": fwctl_content},
+    )
 
 
 # ---------------------------------------------------------------------------
