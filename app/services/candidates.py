@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -26,7 +26,7 @@ def upsert_candidate(
             AccessCandidate.source == source,
         )
     ).first()
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     if candidate is None:
         candidate = AccessCandidate(
             node_id=node_id,

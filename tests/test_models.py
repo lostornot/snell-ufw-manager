@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from app.db import Base
 from app.models import (
@@ -75,7 +75,7 @@ def test_valid_model_graph_can_be_created() -> None:
         node=node,
         operation_type="ufw apply",
         owner="test",
-        locked_at=datetime.now(UTC),
+        locked_at=datetime.now(timezone.utc),
     )
 
     assert node.name == "Tokyo 1"
@@ -85,4 +85,3 @@ def test_valid_model_graph_can_be_created() -> None:
     assert candidate.protocol == "udp"
     assert audit.success is True
     assert lock.node is node
-

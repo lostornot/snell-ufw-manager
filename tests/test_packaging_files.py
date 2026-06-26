@@ -48,6 +48,24 @@ def test_controller_installer_generates_secrets_and_protects_data() -> None:
     assert "/opt/snell-ufw-manager-by-gpt" in script
 
 
+def test_package_declares_python_310_compatibility() -> None:
+    pyproject = read("pyproject.toml")
+
+    assert 'requires-python = ">=3.10"' in pyproject
+
+
+def test_runtime_code_does_not_use_python_311_datetime_utc() -> None:
+    runtime_files = [
+        "app/locks.py",
+        "app/services/candidates.py",
+    ]
+
+    for path in runtime_files:
+        text = read(path)
+        assert "from datetime import UTC" not in text
+        assert "datetime.now(UTC)" not in text
+
+
 def test_readme_documents_security_model() -> None:
     readme = read("README.md")
 

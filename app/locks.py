@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -38,7 +38,7 @@ def acquire_operation_lock(
     if existing is not None:
         return False
 
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     db.add(
         OperationLock(
             node_id=node_id,
@@ -58,4 +58,3 @@ def release_operation_lock(db: Session, *, node_id: int) -> None:
         return
     db.delete(existing)
     db.commit()
-
