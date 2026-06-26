@@ -65,6 +65,10 @@ def test_node_detail_page_renders_action_forms(monkeypatch, tmp_path: Path) -> N
     assert 'action="/nodes/1/edit"' in response.text
     assert 'action="/nodes/1/config"' in response.text
     assert 'action="/nodes/1/delete"' in response.text
+    nodes_page = client.get("/nodes")
+    assert "添加已有节点" in nodes_page.text
+    assert "新 VPS 接入" in nodes_page.text
+    assert 'action="/nodes/1/check-environment"' in nodes_page.text
 
 
 def test_node_detail_actions_call_remote_services(monkeypatch, tmp_path: Path) -> None:

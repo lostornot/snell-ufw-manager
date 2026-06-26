@@ -45,6 +45,7 @@ def test_create_node_from_form_and_list_it(monkeypatch, tmp_path: Path) -> None:
     )
 
     assert response.status_code == 303
+    assert response.headers["location"] == "/nodes/1"
     page = client.get("/nodes")
     assert "Tokyo 1" in page.text
     assert "203.0.113.10" in page.text

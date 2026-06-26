@@ -8,19 +8,54 @@
 </div>
 <dl class="stats">
   <div><dt>节点</dt><dd>{{ node_count }}</dd></div>
-  <div><dt>中转组</dt><dd>{{ relay_group_count }}</dd></div>
-  <div><dt>操作日志</dt><dd>{{ audit_count }}</dd></div>
-  <div><dt>访问方式</dt><dd>本地</dd></div>
+  <div><dt>在线</dt><dd>{{ node_status_counts.online }}</dd></div>
+  <div><dt>离线</dt><dd>{{ node_status_counts.offline }}</dd></div>
+  <div><dt>未检查</dt><dd>{{ node_status_counts.unchecked }}</dd></div>
 </dl>
 <section class="panel">
   <div class="section-title">
-    <h2>工作入口</h2>
+    <h2>节点状态</h2>
     <span class="badge badge-ok">127.0.0.1</span>
   </div>
-  <p class="muted">从“节点”添加 VPS，从“中转组”维护出口 IP/CIDR，再到“访问策略”把中转组应用到指定 Snell 节点。</p>
+  {% if nodes %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>名称</th>
+          <th>入口</th>
+          <th>Snell</th>
+          <th>连接</th>
+          <th>最近错误</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for node in nodes %}
+        {% set state = node_status_map[node.id] %}
+        <tr>
+          <td><a href="/nodes/{{ node.id }}">{{ node.name }}</a></td>
+          <td>{{ node.ssh_alias or node.host }}</td>
+          <td>{{ node.last_status or "未知" }}</td>
+          <td><span class="badge {{ state.badge_class }}">{{ state.label }}</span></td>
+          <td>{{ node.last_error or "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">还没有添加节点。</p>
+  {% endif %}
   <form method="post" action="/nodes/stub" class="visually-hidden" aria-hidden="true">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
     <button type="submit">CSRF 检查</button>
   </form>
+</section>
+<section class="panel">
+  <div class="section-title">
+    <h2>工作入口</h2>
+    <span class="muted">{{ relay_group_count }} 个中转组 · {{ audit_count }} 条日志</span>
+  </div>
+  <p class="muted">添加已有节点后，先在节点详情页执行“测试连接 / 检查环境”，再安装 Snell、应用配置和 UFW 白名单。</p>
 </section>
 {% endblock %}

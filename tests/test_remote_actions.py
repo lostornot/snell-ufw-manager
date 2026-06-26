@@ -119,7 +119,10 @@ def test_check_node_environment_returns_remote_data_and_audits(monkeypatch) -> N
 
     result = check_node_environment(db, node.id)
 
+    db.refresh(node)
     assert result["data"]["snell_fwctl"]["present"] is True
+    assert node.last_seen_at is not None
+    assert node.last_error is None
     assert db.query(AuditLog).one().action == "node.check"
 
 

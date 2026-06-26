@@ -103,21 +103,43 @@ def create_app() -> FastAPI:
         response = templates.TemplateResponse(request, template_name, context)
         return set_local_session_cookie(response, getattr(request.state, "local_session_cookie", None))
 
+    def node_connectivity(node: Node) -> dict[str, str]:
+        if node.last_error:
+            return {"key": "offline", "label": "离线", "badge_class": "badge-warn"}
+        if node.last_seen_at:
+            return {"key": "online", "label": "在线", "badge_class": "badge-ok"}
+        return {"key": "unchecked", "label": "未检查", "badge_class": "badge-off"}
+
+    def node_connectivity_map(nodes: list[Node]) -> dict[int, dict[str, str]]:
+        return {node.id: node_connectivity(node) for node in nodes}
+
     @app.get("/", response_class=HTMLResponse)
     def dashboard(request: Request) -> Response:
         with SessionLocal() as db:
+            nodes_ = list_nodes(db)
+            status_map = node_connectivity_map(nodes_)
+            status_counts = {
+                "online": sum(1 for item in status_map.values() if item["key"] == "online"),
+                "offline": sum(1 for item in status_map.values() if item["key"] == "offline"),
+                "unchecked": sum(1 for item in status_map.values() if item["key"] == "unchecked"),
+            }
             context = authenticated_context(request, "总览")
             context |= {
-                "node_count": db.query(Node).count(),
+                "node_count": len(nodes_),
                 "relay_group_count": db.query(RelayGroup).count(),
                 "audit_count": db.query(AuditLog).count(),
+                "nodes": nodes_,
+                "node_status_map": status_map,
+                "node_status_counts": status_counts,
             }
             return render_authenticated(request, "dashboard.html", context)
 
     @app.get("/nodes", response_class=HTMLResponse)
     def nodes(request: Request, db: Session = Depends(get_session_db)) -> HTMLResponse:
         context = authenticated_context(request, "节点")
-        context["nodes"] = list_nodes(db)
+        nodes_ = list_nodes(db)
+        context["nodes"] = nodes_
+        context["node_status_map"] = node_connectivity_map(nodes_)
         return render_authenticated(
             request,
             "nodes/index.html",
@@ -166,7 +188,7 @@ def create_app() -> FastAPI:
             result_json={"id": node.id},
             success=True,
         )
-        return RedirectResponse("/nodes", status_code=303)
+        return RedirectResponse(f"/nodes/{node.id}", status_code=303)
 
     @app.get("/nodes/{node_id}", response_class=HTMLResponse)
     def node_detail(

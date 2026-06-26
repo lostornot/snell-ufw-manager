@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session, selectinload
@@ -75,6 +76,13 @@ def _audit_remote(
     result: dict[str, Any],
 ) -> None:
     error = result.get("error")
+    if result.get("ok"):
+        node.last_seen_at = datetime.now(timezone.utc)
+        node.last_error = None
+    elif isinstance(error, dict):
+        node.last_error = error.get("message") or "remote action failed"
+    else:
+        node.last_error = "remote action failed"
     write_audit(
         db,
         actor="admin",
@@ -96,12 +104,7 @@ def refresh_node_status(db: Session, node_id: int) -> dict[str, Any]:
     if result.get("ok"):
         data = result.get("data", {})
         node.last_status = data.get("status")
-        node.last_error = None
-    else:
-        error = result.get("error")
-        node.last_error = error.get("message") if isinstance(error, dict) else "status failed"
     _audit_remote(db, action="node.status", node=node, request_json=payload, result=result)
-    db.commit()
     return result
 
 
