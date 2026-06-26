@@ -1,8 +1,7 @@
-"""SQLite database layer for Snell UFW Manager."""
+"""SQLite database layer for VPS UFW Firewall Manager."""
 
 import os
 from pathlib import Path
-
 import aiosqlite
 
 DB_PATH = os.environ.get(
@@ -24,26 +23,20 @@ CREATE TABLE IF NOT EXISTS nodes (
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS relay_groups (
+CREATE TABLE IF NOT EXISTS ip_groups (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     name        TEXT NOT NULL UNIQUE,
     remark      TEXT DEFAULT '',
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
-CREATE TABLE IF NOT EXISTS relay_ips (
+CREATE TABLE IF NOT EXISTS ip_group_items (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    group_id    INTEGER NOT NULL REFERENCES relay_groups(id) ON DELETE CASCADE,
+    group_id    INTEGER NOT NULL REFERENCES ip_groups(id) ON DELETE CASCADE,
     ip_cidr     TEXT NOT NULL,
     note        TEXT DEFAULT '',
     created_at  TEXT DEFAULT (datetime('now')),
     UNIQUE(group_id, ip_cidr)
-);
-
-CREATE TABLE IF NOT EXISTS node_relay_groups (
-    node_id     INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
-    group_id    INTEGER NOT NULL REFERENCES relay_groups(id) ON DELETE CASCADE,
-    PRIMARY KEY (node_id, group_id)
 );
 
 CREATE TABLE IF NOT EXISTS op_logs (
@@ -53,7 +46,7 @@ CREATE TABLE IF NOT EXISTS op_logs (
     action      TEXT NOT NULL,
     target      TEXT,
     detail      TEXT,
-    success     INTEGER,
+    success     INTEGER NOT NULL,
     created_at  TEXT DEFAULT (datetime('now'))
 );
 """
@@ -81,7 +74,6 @@ def _get_db():
 async def get_all_nodes() -> list[dict]:
     async with _get_db() as db:
         db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA foreign_keys=ON")
         cursor = await db.execute("SELECT * FROM nodes ORDER BY id")
         return [dict(row) for row in await cursor.fetchall()]
 
@@ -132,163 +124,83 @@ async def delete_node(node_id: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Relay Groups
+# IP Groups
 # ---------------------------------------------------------------------------
 
-async def get_all_relay_groups() -> list[dict]:
+async def get_all_ip_groups() -> list[dict]:
     async with _get_db() as db:
         db.row_factory = aiosqlite.Row
-        await db.execute("PRAGMA foreign_keys=ON")
-        cursor = await db.execute("SELECT * FROM relay_groups ORDER BY id")
+        cursor = await db.execute("SELECT * FROM ip_groups ORDER BY id")
         groups = [dict(row) for row in await cursor.fetchall()]
         for group in groups:
             cursor = await db.execute(
-                "SELECT * FROM relay_ips WHERE group_id = ? ORDER BY id",
+                "SELECT * FROM ip_group_items WHERE group_id = ? ORDER BY id",
                 (group["id"],),
             )
             group["ips"] = [dict(row) for row in await cursor.fetchall()]
-            cursor = await db.execute(
-                """SELECT n.id, n.name FROM nodes n
-                   JOIN node_relay_groups nrg ON n.id = nrg.node_id
-                   WHERE nrg.group_id = ?""",
-                (group["id"],),
-            )
-            group["nodes"] = [dict(row) for row in await cursor.fetchall()]
         return groups
 
 
-async def get_relay_group(group_id: int) -> dict | None:
+async def get_ip_group(group_id: int) -> dict | None:
     async with _get_db() as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
-            "SELECT * FROM relay_groups WHERE id = ?", (group_id,)
+            "SELECT * FROM ip_groups WHERE id = ?", (group_id,)
         )
-        group = await cursor.fetchone()
-        if not group:
+        row = await cursor.fetchone()
+        if not row:
             return None
-        group = dict(group)
+        group = dict(row)
         cursor = await db.execute(
-            "SELECT * FROM relay_ips WHERE group_id = ? ORDER BY id",
+            "SELECT * FROM ip_group_items WHERE group_id = ? ORDER BY id",
             (group_id,),
         )
         group["ips"] = [dict(row) for row in await cursor.fetchall()]
-        cursor = await db.execute(
-            """SELECT n.id, n.name FROM nodes n
-               JOIN node_relay_groups nrg ON n.id = nrg.node_id
-               WHERE nrg.group_id = ?""",
-            (group_id,),
-        )
-        group["nodes"] = [dict(row) for row in await cursor.fetchall()]
         return group
 
 
-async def create_relay_group(name: str, remark: str = "") -> int:
+async def create_ip_group(name: str, remark: str = "") -> int:
     async with _get_db() as db:
         cursor = await db.execute(
-            "INSERT INTO relay_groups (name, remark) VALUES (?, ?)",
+            "INSERT INTO ip_groups (name, remark) VALUES (?, ?)",
             (name, remark),
         )
         await db.commit()
         return cursor.lastrowid
 
 
-async def update_relay_group(group_id: int, **kwargs) -> None:
+async def update_ip_group(group_id: int, **kwargs) -> None:
     if not kwargs:
         return
     async with _get_db() as db:
         sets = ", ".join(f"{k} = ?" for k in kwargs)
         values = list(kwargs.values()) + [group_id]
-        await db.execute(f"UPDATE relay_groups SET {sets} WHERE id = ?", values)
+        await db.execute(f"UPDATE ip_groups SET {sets} WHERE id = ?", values)
         await db.commit()
 
 
-async def delete_relay_group(group_id: int) -> None:
+async def delete_ip_group(group_id: int) -> None:
     async with _get_db() as db:
         await db.execute("PRAGMA foreign_keys=ON")
-        await db.execute("DELETE FROM relay_groups WHERE id = ?", (group_id,))
+        await db.execute("DELETE FROM ip_groups WHERE id = ?", (group_id,))
         await db.commit()
 
 
-async def add_relay_ip(group_id: int, ip_cidr: str, note: str = "") -> int:
+async def add_ip_group_item(group_id: int, ip_cidr: str, note: str = "") -> int:
     async with _get_db() as db:
+        await db.execute("PRAGMA foreign_keys=ON")
         cursor = await db.execute(
-            "INSERT INTO relay_ips (group_id, ip_cidr, note) VALUES (?, ?, ?)",
+            "INSERT INTO ip_group_items (group_id, ip_cidr, note) VALUES (?, ?, ?)",
             (group_id, ip_cidr, note),
         )
         await db.commit()
         return cursor.lastrowid
 
 
-async def delete_relay_ip(ip_id: int) -> None:
+async def delete_ip_group_item(item_id: int) -> None:
     async with _get_db() as db:
-        await db.execute("DELETE FROM relay_ips WHERE id = ?", (ip_id,))
+        await db.execute("DELETE FROM ip_group_items WHERE id = ?", (item_id,))
         await db.commit()
-
-
-async def update_relay_ip(ip_id: int, **kwargs) -> None:
-    if not kwargs:
-        return
-    async with _get_db() as db:
-        sets = ", ".join(f"{k} = ?" for k in kwargs)
-        values = list(kwargs.values()) + [ip_id]
-        await db.execute(f"UPDATE relay_ips SET {sets} WHERE id = ?", values)
-        await db.commit()
-
-
-# ---------------------------------------------------------------------------
-# Node ↔ Relay Group Associations
-# ---------------------------------------------------------------------------
-
-async def get_node_relay_group_ids(node_id: int) -> list[int]:
-    async with _get_db() as db:
-        cursor = await db.execute(
-            "SELECT group_id FROM node_relay_groups WHERE node_id = ?",
-            (node_id,),
-        )
-        return [row[0] for row in await cursor.fetchall()]
-
-
-async def set_node_relay_groups(node_id: int, group_ids: list[int]) -> None:
-    async with _get_db() as db:
-        await db.execute("PRAGMA foreign_keys=ON")
-        await db.execute(
-            "DELETE FROM node_relay_groups WHERE node_id = ?", (node_id,)
-        )
-        for gid in group_ids:
-            await db.execute(
-                "INSERT OR IGNORE INTO node_relay_groups (node_id, group_id) VALUES (?, ?)",
-                (node_id, gid),
-            )
-        await db.commit()
-
-
-async def get_node_allowed_ips(node_id: int) -> list[dict]:
-    """Get all IPs that should be allowed on this node (from all associated relay groups)."""
-    async with _get_db() as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            """SELECT DISTINCT ri.ip_cidr, ri.note, rg.name AS group_name
-               FROM relay_ips ri
-               JOIN relay_groups rg ON ri.group_id = rg.id
-               JOIN node_relay_groups nrg ON rg.id = nrg.group_id
-               WHERE nrg.node_id = ?
-               ORDER BY rg.name, ri.ip_cidr""",
-            (node_id,),
-        )
-        return [dict(row) for row in await cursor.fetchall()]
-
-
-async def get_groups_for_ip(ip_cidr: str) -> list[dict]:
-    """Find which groups contain a given IP."""
-    async with _get_db() as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            """SELECT rg.id, rg.name FROM relay_groups rg
-               JOIN relay_ips ri ON rg.id = ri.group_id
-               WHERE ri.ip_cidr = ?""",
-            (ip_cidr,),
-        )
-        return [dict(row) for row in await cursor.fetchall()]
 
 
 # ---------------------------------------------------------------------------

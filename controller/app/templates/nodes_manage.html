@@ -1,114 +1,125 @@
 {% extends "base.html" %}
 {% set active_page = "nodes_manage" %}
 
-{% block title %}节点管理 — Snell UFW Manager{% endblock %}
+{% block title %}节点管理 — VPS UFW Firewall Manager{% endblock %}
 
 {% block content %}
-<div class="page-title">
-  <span class="icon">🖥️</span> 节点管理
-</div>
+<header class="page-header" style="margin-bottom: 24px;">
+  <div>
+    <h1 class="page-title">🖥️ 边缘节点管理</h1>
+    <p class="page-subtitle">添加和配置被控 VPS 节点，获取一键初始化脚本。</p>
+  </div>
+</header>
 
 <!-- Step 1: Setup Script -->
-<div class="card mb-3">
-  <div class="card-header">
-    <div class="card-title"><span>📜</span> 第一步：初始化落地节点</div>
+<div class="glass-card" style="margin-bottom: 24px; padding: 24px;">
+  <div class="section-header" style="margin-bottom: 12px;">
+    <h3 style="font-size: 1.25rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+      <span>📜</span> 第一步：初始化落地节点
+    </h3>
     <button class="btn btn-secondary btn-sm"
             hx-get="/partials/setup-script"
             hx-target="#setup-script-area"
             hx-swap="innerHTML">
-      <span class="spinner htmx-indicator"></span>
+      <span class="spinner htmx-indicator" style="margin-right: 4px;"></span>
       🔑 生成初始化脚本
     </button>
   </div>
-  <p class="text-secondary text-sm mb-3">
-    在落地 VPS 上以 <strong>root</strong> 运行初始化脚本（创建 snellmgr 用户 + 部署 snell-fwctl + 配置 SSH 密钥）。
-    完成后回到第二步添加节点。
+  <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 16px;">
+    在落地 VPS 上以 <strong>root</strong> 用户运行初始化脚本，完成环境设置（会自动创建被控用户 <code>snellmgr</code> 并安装受限管理脚本 <code>snell-fwctl</code>，同时部署控制中心 SSH 密钥）。完成后，即可执行第二步添加节点。
   </p>
-  <div id="setup-script-area">
-    <p class="text-secondary text-sm">点击右上角「生成初始化脚本」查看可复制的脚本</p>
+  <div id="setup-script-area" style="background: rgba(0, 0, 0, 0.2); border-radius: var(--radius-sm); border: 1px solid rgba(255, 255, 255, 0.05); padding: 12px; color: var(--text-muted); font-size: 0.85rem;">
+    点击上方「生成初始化脚本」查看一键运行脚本命令。
   </div>
 </div>
 
 <!-- Step 2: Discover Node -->
-<div class="card mb-3">
-  <div class="card-header">
-    <div class="card-title"><span>🔍</span> 第二步：发现并添加节点</div>
+<div class="glass-card" style="margin-bottom: 24px; padding: 24px;">
+  <div class="section-header" style="margin-bottom: 12px;">
+    <h3 style="font-size: 1.25rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+      <span>🔍</span> 第二步：发现并添加节点
+    </h3>
   </div>
-  <p class="text-secondary text-sm mb-2">
-    输入落地 VPS 的 IP，自动检测主机名和 Snell 端口（也可直接指定 Snell 端口）。
+  <p class="text-secondary" style="font-size: 0.9rem; margin-bottom: 16px;">
+    输入初始化完成的落地 VPS 的 IP 地址，系统会自动 SSH 连接并检测主机名称和默认 SNELL 端口。
   </p>
   <form class="form-inline"
         hx-post="/api/nodes/discover"
         hx-target="#node-manage-list"
-        hx-swap="outerHTML">
-    <div class="form-group" style="flex:3;">
-      <label class="form-label">节点 IP *</label>
-      <input class="form-input" name="host" placeholder="1.2.3.4" required>
+        hx-swap="outerHTML"
+        style="display: flex; gap: 12px; align-items: flex-end;">
+    <div class="form-group" style="flex: 3; margin-bottom: 0;">
+      <label class="form-label">节点 IP 地址 / 域名 *</label>
+      <input class="form-input mono" name="host" placeholder="例如：216.195.204.72" required>
     </div>
-    <div class="form-group" style="flex:1;">
+    <div class="form-group" style="flex: 1; margin-bottom: 0;">
       <label class="form-label">SSH 端口</label>
-      <input class="form-input" name="ssh_port" type="number" value="22">
+      <input class="form-input mono" name="ssh_port" type="number" value="22" required>
     </div>
-    <div class="form-group" style="flex:1.5;">
-      <label class="form-label">Snell 端口</label>
-      <input class="form-input" name="snell_port" type="number" placeholder="自动检测">
+    <div class="form-group" style="flex: 1.5; margin-bottom: 0;">
+      <label class="form-label">SNELL 端口</label>
+      <input class="form-input mono" name="snell_port" type="number" placeholder="自动检测">
     </div>
-    <button type="submit" class="btn btn-primary" style="margin-top:18px;">
-      <span class="spinner htmx-indicator"></span>
+    <button type="submit" class="btn btn-primary" style="height: 42px;">
+      <span class="spinner htmx-indicator" style="margin-right: 6px;"></span>
       🔍 发现并添加
     </button>
   </form>
 </div>
 
 <!-- Manual Add (collapsible) -->
-<details class="card mb-3">
-  <summary class="card-title" style="cursor:pointer;padding:4px 0;">
-    <span>✏️</span> 手动添加节点（高级）
-  </summary>
-  <form hx-post="/api/nodes"
-        hx-target="#node-manage-list"
-        hx-swap="outerHTML"
-        style="margin-top:12px;">
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">名称 *</label>
-        <input class="form-input" name="name" placeholder="如：美国落地-01" required>
+<div class="glass-card" style="margin-bottom: 32px; padding: 20px;">
+  <details style="width: 100%;">
+    <summary style="cursor: pointer; font-family: var(--font-headings); font-weight: 700; font-size: 1.05rem; color: #fff; display: flex; align-items: center; gap: 8px; outline: none; list-style: none;">
+      <span>✏️</span> 手动添加节点（高级配置）<span style="font-size: 0.8rem; color: var(--text-muted); font-weight: normal; margin-left: auto;">点击展开 / 收起</span>
+    </summary>
+    <form hx-post="/api/nodes"
+          hx-target="#node-manage-list"
+          hx-swap="outerHTML"
+          style="margin-top: 16px; display: flex; flex-direction: column; gap: 16px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">节点名称 *</label>
+          <input class="form-input" name="name" placeholder="如：美国落地-01" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">IP / 域名 *</label>
+          <input class="form-input mono" name="host" placeholder="216.195.204.72" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">SSH 端口</label>
+          <input class="form-input mono" name="ssh_port" type="number" value="22" required>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">IP / 主机名 *</label>
-        <input class="form-input" name="host" placeholder="1.2.3.4" required>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">SSH 登录用户名</label>
+          <input class="form-input" name="ssh_user" value="snellmgr" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">SNELL 端口 *</label>
+          <input class="form-input mono" name="snell_port" type="number" placeholder="28261" required>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">SNELL 配置文件路径</label>
+          <input class="form-input" name="snell_conf" value="{{ default_snell_conf }}" required>
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">SSH 端口</label>
-        <input class="form-input" name="ssh_port" type="number" value="22">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">备注说明</label>
+        <input class="form-input" name="remark" placeholder="该主机的额外说明，如：由搬瓦工提供、年付50刀...">
       </div>
-    </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">SSH 用户名</label>
-        <input class="form-input" name="ssh_user" value="snellmgr">
+      <div style="margin-top: 8px;">
+        <button type="submit" class="btn btn-secondary">
+          <span class="spinner htmx-indicator" style="margin-right: 6px;"></span>
+          添加节点
+        </button>
       </div>
-      <div class="form-group">
-        <label class="form-label">Snell 端口 *</label>
-        <input class="form-input" name="snell_port" type="number" placeholder="28261" required>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Snell 配置路径</label>
-        <input class="form-input" name="snell_conf" value="{{ default_snell_conf }}">
-      </div>
-    </div>
-    <div class="form-group">
-      <label class="form-label">备注</label>
-      <input class="form-input" name="remark" placeholder="可选备注">
-    </div>
-    <button type="submit" class="btn btn-secondary">
-      <span class="spinner htmx-indicator"></span>
-      添加节点
-    </button>
-  </form>
-</details>
+    </form>
+  </details>
+</div>
 
-<!-- Node List -->
+<!-- Node List Container -->
 <div id="node-manage-list">
   {% include "partials/node_manage_list.html" %}
 </div>

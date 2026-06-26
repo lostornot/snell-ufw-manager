@@ -1,40 +1,43 @@
 {% extends "base.html" %}
 {% set active_page = "logs" %}
 
-{% block title %}操作日志 — Snell UFW Manager{% endblock %}
+{% block title %}操作日志 — VPS UFW Firewall Manager{% endblock %}
 
 {% block content %}
-<div class="page-title">
-  <span class="icon">📋</span> 操作日志
-</div>
+<header class="page-header" style="margin-bottom: 24px;">
+  <div>
+    <h1 class="page-title">📋 操作日志</h1>
+    <p class="page-subtitle">系统防火墙变更和节点连接的历史操作记录</p>
+  </div>
+</header>
 
-<div class="card">
+<div class="glass-card" style="padding: 24px;">
   {% if logs %}
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>时间</th>
-          <th>节点</th>
-          <th>操作</th>
-          <th>目标</th>
-          <th>详情</th>
-          <th>状态</th>
+          <th>操作时间</th>
+          <th>节点名称</th>
+          <th>操作类型</th>
+          <th>操作目标</th>
+          <th>详情描述</th>
+          <th>操作状态</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
         <tr>
-          <td class="text-secondary text-sm mono">{{ log.created_at }}</td>
-          <td>{{ log.node_name or '—' }}</td>
-          <td><span class="tag tag-info">{{ log.action }}</span></td>
-          <td class="mono">{{ log.target or '—' }}</td>
-          <td class="text-secondary text-sm">{{ log.detail or '—' }}</td>
+          <td class="text-secondary text-sm mono" style="font-size: 0.85rem; color: var(--text-secondary);">{{ log.created_at }}</td>
+          <td style="font-weight: 600;">{{ log.node_name or '—' }}</td>
+          <td><span class="tag tag-info" style="font-size: 0.72rem; padding: 2px 8px;">{{ log.action }}</span></td>
+          <td class="mono" style="font-size: 0.85rem; color: var(--accent-purple);">{{ log.target or '—' }}</td>
+          <td style="color: var(--text-secondary);">{{ log.detail or '—' }}</td>
           <td>
             {% if log.success %}
-              <span class="tag tag-allow">✓ 成功</span>
+              <span class="tag tag-allow" style="font-size: 0.72rem; padding: 2px 8px;">✓ 成功</span>
             {% else %}
-              <span class="tag tag-block">✗ 失败</span>
+              <span class="tag tag-block" style="font-size: 0.72rem; padding: 2px 8px;">✗ 失败</span>
             {% endif %}
           </td>
         </tr>
@@ -43,9 +46,9 @@
     </table>
   </div>
   {% else %}
-  <div class="empty-state">
-    <div class="icon">📋</div>
-    <p>暂无操作记录</p>
+  <div class="empty-state" style="padding: 40px; text-align: center; color: var(--text-muted);">
+    <div style="font-size: 2.5rem; margin-bottom: 12px;">📋</div>
+    <p>暂无任何操作记录</p>
   </div>
   {% endif %}
 </div>

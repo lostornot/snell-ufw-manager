@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% set active_page = "ip_groups" %}
+
+{% block title %}IP 分组管理 — VPS UFW Firewall Manager{% endblock %}
+
+{% block content %}
+<header class="page-header" style="margin-bottom: 24px;">
+  <div>
+    <h1 class="page-title">👥 IP 分组管理</h1>
+    <p class="page-subtitle">定义常用 IP 或网段的分组，在向节点授权端口时作为“宏”一键放行组内所有 IP。</p>
+  </div>
+</header>
+
+<!-- Create New Group -->
+<div class="glass-card" style="margin-bottom: 24px; padding: 24px;">
+  <h3 style="font-size: 1.15rem; color: #fff; margin-bottom: 16px; display: flex; align-items: center; gap: 6px;">
+    <span>➕</span> 新建 IP 分组
+  </h3>
+  <form class="form-inline"
+        hx-post="/api/ip-groups"
+        hx-target="#ip-group-list"
+        hx-swap="outerHTML"
+        style="display: flex; gap: 12px; align-items: flex-end;">
+    <div class="form-group" style="flex: 2; margin-bottom: 0;">
+      <label class="form-label">分组名称 *</label>
+      <input class="form-input" name="name" placeholder="组名，如：中转服务器组、公司固定IP" required>
+    </div>
+    <div class="form-group" style="flex: 3; margin-bottom: 0;">
+      <label class="form-label">备注 (可选)</label>
+      <input class="form-input" name="remark" placeholder="该分组的用途描述...">
+    </div>
+    <button type="submit" class="btn btn-primary" style="height: 42px;">
+      <span class="spinner htmx-indicator" style="margin-right: 6px;"></span>
+      创建分组
+    </button>
+  </form>
+</div>
+
+<!-- Group List Container -->
+<div id="ip-group-list">
+  {% include "partials/ip_group_list.html" %}
+</div>
+
+<!-- Simple Accordion Style and Toggle -->
+<style>
+  .ip-group {
+    background: var(--bg-glass);
+    border: 1px solid var(--border-glass);
+    border-radius: var(--radius-lg);
+    margin-bottom: 16px;
+    overflow: hidden;
+    transition: var(--transition-smooth);
+  }
+  .ip-group.open {
+    border-color: rgba(139, 92, 246, 0.25);
+    box-shadow: var(--shadow-glow-purple);
+  }
+  .ip-group-body {
+    display: none;
+  }
+  .ip-group.open .ip-group-body {
+    display: block;
+  }
+  .ip-group-header .arrow {
+    transition: transform 0.2s ease;
+  }
+  .ip-group.open .ip-group-header .arrow {
+    transform: rotate(90deg);
+  }
+</style>
+{% endblock %}

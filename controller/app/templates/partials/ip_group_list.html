@@ -1,0 +1,107 @@
+{% if toast %}
+<div class="toast-trigger hidden"
+     data-message="{{ toast.message }}"
+     data-type="{{ toast.type | default('success') }}">
+</div>
+{% endif %}
+
+<div id="ip-group-list">
+{% if groups %}
+  {% for group in groups %}
+  <div class="ip-group {% if new_group_id == group.id %}open{% endif %}">
+    <!-- Header -->
+    <div class="ip-group-header" onclick="this.parentElement.classList.toggle('open')" style="display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; cursor: pointer; transition: background 0.2s ease;">
+      <div class="ip-group-name" style="font-size: 1.15rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px;">
+        <span class="arrow" style="display: inline-block;">▶</span>
+        <span>📦</span>
+        {{ group.name }}
+        <span class="count" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{{ group.ips | length }} IP</span>
+      </div>
+      <div class="ip-group-meta" style="font-size: 0.85rem; color: var(--text-secondary);">
+        {% if group.remark %}
+          <span>{{ group.remark }}</span>
+        {% else %}
+          <span style="font-style: italic; color: var(--text-muted);">暂无描述</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Body (Collapsible) -->
+    <div class="ip-group-body" style="padding: 24px; border-top: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.15);">
+      
+      <!-- IP List Table -->
+      {% if group.ips %}
+      <div class="table-wrap" style="margin-bottom: 20px;">
+        <table>
+          <thead>
+            <tr>
+              <th>IP / CIDR 网段</th>
+              <th>备注说明</th>
+              <th style="width: 80px; text-align: right;">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ip in group.ips %}
+            <tr>
+              <td class="mono" style="font-size: 0.9rem; color: #fff; font-weight: 600;">{{ ip.ip_cidr }}</td>
+              <td style="color: var(--text-secondary);">{{ ip.note or '—' }}</td>
+              <td style="text-align: right;">
+                <button class="btn btn-danger btn-sm"
+                        hx-delete="/api/ip-groups/{{ group.id }}/ips/{{ ip.id }}"
+                        hx-target="#ip-group-list"
+                        hx-swap="outerHTML"
+                        hx-confirm="确定要从分组「{{ group.name }}」中移除 IP：{{ ip.ip_cidr }} 吗？">
+                  移除
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.88rem; font-style: italic; border: 1px dashed rgba(255, 255, 255, 0.05); border-radius: var(--radius-md); margin-bottom: 20px;">
+        该分组内暂无任何 IP，请在下方添加。
+      </div>
+      {% endif %}
+
+      <!-- Add IP Form -->
+      <form class="form-inline"
+            hx-post="/api/ip-groups/{{ group.id }}/ips"
+            hx-target="#ip-group-list"
+            hx-swap="outerHTML"
+            style="display: flex; gap: 12px; align-items: flex-end; padding-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+          <label class="form-label" style="font-size: 0.72rem;">IP 或 CIDR *</label>
+          <input class="form-input mono" name="ip_cidr" placeholder="如 123.45.67.89 或 192.168.1.0/24" required>
+        </div>
+        <div class="form-group" style="flex: 2; margin-bottom: 0;">
+          <label class="form-label" style="font-size: 0.72rem;">备注说明</label>
+          <input class="form-input" name="note" placeholder="例如：荷兰代理服务器、办公室宽带">
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm" style="height: 38px;">
+          <span class="spinner htmx-indicator" style="margin-right: 6px;"></span>
+          + 添加到组
+        </button>
+      </form>
+
+      <!-- Delete Group Action -->
+      <div style="display: flex; justify-content: flex-end; margin-top: 16px;">
+        <button class="btn btn-danger btn-sm"
+                hx-delete="/api/ip-groups/{{ group.id }}"
+                hx-target="#ip-group-list"
+                hx-swap="outerHTML"
+                hx-confirm="⚠️ 警告：确定要删除 IP 分组「{{ group.name }}」吗？删除后此分组内的数据将彻底清空。">
+          🗑️ 删除该分组
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="glass-card empty-state" style="padding: 40px; text-align: center; color: var(--text-muted);">
+    <div style="font-size: 2.5rem; margin-bottom: 12px;">👥</div>
+    <p>当前没有配置任何 IP 分组，请在上方输入名称创建。</p>
+  </div>
+{% endif %}
+</div>

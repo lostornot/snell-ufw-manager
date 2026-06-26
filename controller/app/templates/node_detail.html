@@ -1,175 +1,159 @@
 {% extends "base.html" %}
 {% set active_page = "dashboard" %}
 
-{% block title %}{{ node.name }} — Snell UFW Manager{% endblock %}
+{% block title %}{{ node.name }} — VPS UFW Firewall Manager{% endblock %}
 
 {% block content %}
-<a href="/" class="back-link">← 返回仪表盘</a>
+<div style="margin-bottom: 24px;">
+  <a href="/" class="btn btn-ghost btn-sm">← 返回仪表盘</a>
+</div>
 
 <!-- Node Header -->
-<div class="node-header">
-  <div class="node-header-info">
-    <h1>
-      <span class="status-dot unknown"
-            hx-get="/api/nodes/{{ node.id }}/ping"
-            hx-trigger="load"
-            hx-swap="outerHTML"></span>
-      {{ node.name }}
-    </h1>
-    <div class="node-header-badges">
-      <span class="tag tag-info mono">{{ node.host }}:{{ node.ssh_port }}</span>
-      <span class="tag tag-info">Snell: {{ node.snell_port }}</span>
-      {% if node.remark %}
-      <span class="tag" style="background:var(--tag-bg);color:var(--tag-text);">{{ node.remark }}</span>
-      {% endif %}
+<div class="glass-card" style="margin-bottom: 32px; padding: 24px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div>
+      <h1 style="font-size: 1.8rem; color: #fff; display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+        <span class="status-dot unknown"
+              hx-get="/api/nodes/{{ node.id }}/ping"
+              hx-trigger="load"
+              hx-swap="outerHTML"></span>
+        {{ node.name }}
+      </h1>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span class="tag tag-info mono">连接地址: {{ node.host }}:{{ node.ssh_port }}</span>
+        <span class="tag tag-info">默认 SNELL 端口: {{ node.snell_port }}</span>
+        {% if node.remark %}
+        <span class="tag" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary);">备注: {{ node.remark }}</span>
+        {% endif %}
+      </div>
     </div>
-  </div>
-  <div class="node-header-actions">
-    <button class="btn btn-secondary"
-            hx-post="/api/nodes/{{ node.id }}/test"
-            hx-target="#toast-container"
-            hx-swap="beforeend">
-      <span class="spinner htmx-indicator"></span>
-      🔗 测试连接
-    </button>
-    <button class="btn btn-primary"
-            hx-post="/api/nodes/{{ node.id }}/sync"
-            hx-target="#toast-container"
-            hx-swap="beforeend"
-            hx-confirm="确定将白名单同步到 {{ node.name }}？">
-      <span class="spinner htmx-indicator"></span>
-      🔄 同步到节点
-    </button>
-  </div>
-</div>
-
-<!-- Relay Group Association -->
-<div class="card section">
-  <div class="card-header">
-    <div class="card-title"><span>🔗</span> 已关联中转组</div>
-  </div>
-  <form hx-put="/api/nodes/{{ node.id }}/relay-groups"
-        hx-target="#toast-container"
-        hx-swap="beforeend">
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
-      {% for group in all_groups %}
-      <label class="checkbox-label">
-        <input type="checkbox" name="group_ids" value="{{ group.id }}"
-               {% if group.id in node_group_ids %}checked{% endif %}>
-        {{ group.name }}
-        <span class="group-meta">{{ group.ips | length }} IP</span>
-      </label>
-      {% else %}
-      <p class="text-secondary text-sm">还没有中转组，去 <a href="/relay-groups">创建一个</a></p>
-      {% endfor %}
-    </div>
-    {% if all_groups %}
-    <div class="mt-3 flex gap-2">
-      <button type="submit" class="btn btn-primary btn-sm">
+    
+    <div>
+      <button class="btn btn-secondary"
+              hx-post="/api/nodes/{{ node.id }}/test"
+              hx-target="#toast-container"
+              hx-swap="beforeend">
         <span class="spinner htmx-indicator"></span>
-        💾 保存关联
+        🔗 测试 SSH 连接
       </button>
     </div>
-    {% endif %}
-  </form>
-</div>
-
-<!-- Expected IPs (from DB) -->
-<div class="card section">
-  <div class="card-header">
-    <div class="card-title">
-      <span>📋</span> 应有白名单
-      <span class="count">{{ allowed_ips | length }}</span>
-    </div>
-  </div>
-  {% if allowed_ips %}
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>IP / CIDR</th>
-          <th>备注</th>
-          <th>来源组</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for ip in allowed_ips %}
-        <tr>
-          <td class="mono">{{ ip.ip_cidr }}</td>
-          <td class="text-secondary">{{ ip.note or '—' }}</td>
-          <td><span class="applied-node-tag">{{ ip.group_name }}</span></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  {% else %}
-  <div class="empty-state">
-    <p>没有关联任何中转组的 IP</p>
-  </div>
-  {% endif %}
-</div>
-
-<!-- Live Whitelist (from UFW via SSH) -->
-<div class="card section">
-  <div class="section-header">
-    <div class="card-title"><span>🛡️</span> 实际 UFW 规则</div>
-    <button class="btn btn-ghost btn-sm"
-            hx-get="/partials/nodes/{{ node.id }}/whitelist"
-            hx-target="#live-whitelist"
-            hx-swap="innerHTML">
-      <span class="spinner htmx-indicator"></span>
-      🔄 刷新
-    </button>
-  </div>
-  <div id="live-whitelist">
-    <div class="loading-overlay"
-         hx-get="/partials/nodes/{{ node.id }}/whitelist"
-         hx-trigger="load"
-         hx-swap="outerHTML">
-      <span class="spinner"></span> 正在从节点获取 UFW 规则...
-    </div>
   </div>
 </div>
 
-<!-- Access Log (from UFW log via SSH) -->
-<div class="card section">
-  <div class="section-header">
-    <div class="card-title"><span>👁️</span> 最近访问 ({{ access_log_hours }}h)</div>
-    <button class="btn btn-ghost btn-sm"
-            hx-get="/partials/nodes/{{ node.id }}/access-log?hours={{ access_log_hours }}"
-            hx-target="#access-log"
-            hx-swap="innerHTML">
-      <span class="spinner htmx-indicator"></span>
-      🔄 刷新
-    </button>
-  </div>
-  <div id="access-log">
-    <div class="loading-overlay"
-         hx-get="/partials/nodes/{{ node.id }}/access-log?hours={{ access_log_hours }}"
-         hx-trigger="load"
-         hx-swap="outerHTML">
-      <span class="spinner"></span> 正在从节点获取访问日志...
+<!-- Main Detail Layout -->
+<div class="node-detail-layout">
+  
+  <!-- Left Column: Ports Cards Grid & Logs -->
+  <div class="port-grid-section">
+    <!-- Port Cards Container Card -->
+    <div class="glass-card" style="padding: 24px;">
+      <div class="section-header" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 12px;">
+        <h2 style="font-size: 1.35rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+          <span>🛡️</span> UFW 服务端口状态
+        </h2>
+        <button class="btn btn-ghost btn-sm"
+                hx-get="/api/nodes/{{ node.id }}/ports"
+                hx-target="#port-cards-grid"
+                hx-swap="innerHTML">
+          <span class="spinner htmx-indicator"></span> 刷新规则
+        </button>
+      </div>
+      
+      <!-- Port Cards Grid Target -->
+      <div id="port-cards-grid">
+        <div class="loading-overlay"
+             hx-get="/api/nodes/{{ node.id }}/ports"
+             hx-trigger="load"
+             hx-swap="outerHTML">
+          <span class="spinner"></span> 正在从远程主机获取 UFW 规则...
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-<!-- Operation Log -->
-<div class="card section">
-  <div class="card-header">
-    <div class="card-title">
-      <span>📋</span> 操作日志
-      <span class="count">{{ logs | length }}</span>
+    <!-- Access Log Candidate Analysis -->
+    <div class="glass-card" style="padding: 24px;">
+      <div class="section-header" style="margin-bottom: 16px;">
+        <h3 style="font-size: 1.2rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+          <span>👁️</span> UFW 拦截候选 IP (最近 24 小时)
+        </h3>
+        <button class="btn btn-ghost btn-sm"
+                hx-get="/partials/nodes/{{ node.id }}/access-log"
+                hx-target="#access-log"
+                hx-swap="innerHTML">
+          <span class="spinner htmx-indicator"></span> 刷新日志
+        </button>
+      </div>
+      <div id="access-log">
+        <div class="loading-overlay"
+             hx-get="/partials/nodes/{{ node.id }}/access-log"
+             hx-trigger="load"
+             hx-swap="outerHTML">
+          <span class="spinner"></span> 正在读取 UFW 安全拦截日志...
+        </div>
+      </div>
     </div>
-    <button class="btn btn-ghost btn-sm"
-            hx-get="/partials/nodes/{{ node.id }}/op-log"
-            hx-target="#op-log"
-            hx-swap="innerHTML">
-      🔄 刷新
-    </button>
   </div>
-  <div id="op-log">
-    {% include "partials/op_log.html" %}
+
+  <!-- Right Column: Sidebar Sticky Form -->
+  <div class="sidebar-section">
+    <div class="glass-card sticky" style="padding: 24px;">
+      <h3>⚡ 开启服务端口</h3>
+      <form hx-post="/api/nodes/{{ node.id }}/ports"
+            hx-target="#port-cards-grid"
+            hx-swap="innerHTML"
+            hx-indicator="#open-port-spinner">
+        
+        <div class="form-group">
+          <label class="form-label">端口号 *</label>
+          <input type="number" name="port" class="form-input mono" placeholder="如 8388" required min="1" max="65535">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">协议 *</label>
+          <select name="protocol" class="form-select">
+            <option value="both">TCP + UDP (推荐)</option>
+            <option value="tcp">TCP ONLY</option>
+            <option value="udp">UDP ONLY</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">服务标签 *</label>
+          <select name="tag" class="form-select">
+            <option value="Snell Proxy">Snell Proxy (代理)</option>
+            <option value="SSH Access">SSH Access (运维)</option>
+            <option value="Custom Rule">Custom Rule (自定义)</option>
+          </select>
+        </div>
+
+        <div class="divider"></div>
+        
+        <div class="sub-header">💡 可选：初始授权白名单</div>
+        
+        <div class="form-group">
+          <label class="form-label">单一 IP 或网段 (CIDR)</label>
+          <input type="text" name="initial_ip" class="form-input mono" placeholder="例如: 1.2.3.4">
+        </div>
+        
+        <div class="form-group">
+          <label class="form-label">或选择现有 IP 分组</label>
+          <select name="initial_ip_group_id" class="form-select">
+            <option value="">-- 不关联分组 --</option>
+            {% for group in ip_groups %}
+            <option value="{{ group.id }}">{{ group.name }} (包含 {{ group.ips | length }} IP)</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div style="margin-top: 24px;">
+          <button type="submit" class="btn btn-primary w-full">
+            <span class="spinner htmx-indicator" id="open-port-spinner" style="margin-right: 6px;"></span>
+            确认部署放行规则
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
+
 </div>
 {% endblock %}

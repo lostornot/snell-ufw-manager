@@ -1,0 +1,16 @@
+{% if toast %}
+<div class="toast-trigger hidden"
+     data-message="{{ toast.message }}"
+     data-type="{{ toast.type | default('success') }}">
+</div>
+{% endif %}
+
+<div id="port-cards-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; width: 100%;">
+  {% for port_num, data in port_data.items() %}
+    {% include "partials/port_card.html" %}
+  {% else %}
+    <div class="empty-state" style="grid-column: 1 / -1; width: 100%; padding: 48px 24px; text-align: center; color: var(--text-muted);">
+      <p>当前节点无额外放行端口规则（或 UFW 为关闭状态）</p>
+    </div>
+  {% endfor %}
+</div>

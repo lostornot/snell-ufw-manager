@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="dark">
+<html lang="zh-CN" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Snell UFW Manager{% endblock %}</title>
-  <meta name="description" content="Centralized UFW firewall management for Snell proxy nodes">
+  <title>{% block title %}VPS UFW Firewall Manager{% endblock %}</title>
+  <meta name="description" content="Centralized UFW firewall management for edge relays">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="/static/style.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
@@ -15,19 +15,16 @@
   <!-- Navigation -->
   <nav class="nav">
     <div class="nav-brand">
-      <span class="icon">🔒</span>
-      <span>Snell UFW</span>
+      <span class="icon">🛡️</span>
+      <span>Firewall Console</span>
     </div>
     <ul class="nav-links">
       <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">📊 仪表盘</a></li>
-      <li><a href="/relay-groups" class="{% if active_page == 'relay_groups' %}active{% endif %}">🔗 中转组</a></li>
+      <li><a href="/ip-groups" class="{% if active_page == 'ip_groups' %}active{% endif %}">👥 IP 分组</a></li>
       <li><a href="/nodes/manage" class="{% if active_page == 'nodes_manage' %}active{% endif %}">🖥️ 节点管理</a></li>
       <li><a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}">📋 操作日志</a></li>
     </ul>
     <div class="nav-spacer"></div>
-    <button class="theme-toggle" onclick="toggleTheme()" title="切换主题">
-      <span id="theme-icon">🌙</span>
-    </button>
   </nav>
 
   <!-- Toast Container -->
@@ -37,27 +34,6 @@
   <main class="container">
     {% block content %}{% endblock %}
   </main>
-
-  <!-- Theme Toggle Script -->
-  <script>
-    function getTheme() {
-      return localStorage.getItem('theme') || 'dark';
-    }
-
-    function applyTheme(theme) {
-      document.documentElement.setAttribute('data-theme', theme);
-      document.getElementById('theme-icon').textContent = theme === 'dark' ? '☀️' : '🌙';
-      localStorage.setItem('theme', theme);
-    }
-
-    function toggleTheme() {
-      const current = getTheme();
-      applyTheme(current === 'dark' ? 'light' : 'dark');
-    }
-
-    // Apply saved theme on load
-    applyTheme(getTheme());
-  </script>
 
   <!-- Toast Handler -->
   <script>

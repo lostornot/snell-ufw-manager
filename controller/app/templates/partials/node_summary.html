@@ -1,0 +1,63 @@
+<div class="glass-card p-6 flex flex-col justify-between h-full group cursor-pointer" id="node-card-{{ node.id }}">
+  <div>
+    <!-- Card Header: Node Hostname & Active Status Pulse -->
+    <div class="node-card-header" style="margin-bottom: 16px;">
+      <div>
+        <h3 class="node-card-name" style="font-size: 1.2rem; font-weight: 700; color: #fff;">
+          {{ node.name }}
+        </h3>
+        <span class="mono text-muted" style="font-size: 0.8rem;">{{ node.host }}</span>
+      </div>
+      <!-- Status Badge -->
+      {% if status.online %}
+      <div class="status-badge">
+        <span class="status-dot online"></span>
+        <span style="font-size: 0.75rem;">ONLINE</span>
+      </div>
+      {% else %}
+      <div class="status-badge offline">
+        <span class="status-dot offline"></span>
+        <span style="font-size: 0.75rem;">OFFLINE</span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Metadata & Connectivity -->
+    <div class="node-card-meta">
+      {% if status.online %}
+      <div class="row">
+        <span class="text-secondary" style="font-size: 0.85rem;">在线时长:</span>
+        <span style="color: var(--text-primary); font-size: 0.85rem;">{{ status.uptime }}</span>
+      </div>
+      <div class="row">
+        <span class="text-secondary" style="font-size: 0.85rem;">系统内核:</span>
+        <span class="mono" style="color: var(--text-primary); font-size: 0.82rem;">{{ status.kernel }}</span>
+      </div>
+      {% else %}
+      <div class="row text-secondary" style="font-size: 0.85rem; color: var(--accent-red) !important; font-weight: 500;">
+        ⚠️ 无法连接: {{ status.error }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Footer Tag-list of active ports -->
+  {% if status.online %}
+  <div class="node-card-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 16px; padding-top: 16px;">
+    <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+      活动放行端口 (UFW 已启用)
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+      {% if status.ports %}
+        {% for p in status.ports %}
+        <span class="tag tag-info mono" style="font-size: 0.75rem; padding: 2px 8px;">
+          {{ p }}
+        </span>
+        {% endfor %}
+      {% else %}
+        <span class="no-rules">无活动端口</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+</div>

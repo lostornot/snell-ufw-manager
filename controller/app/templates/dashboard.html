@@ -1,87 +1,93 @@
 {% extends "base.html" %}
 {% set active_page = "dashboard" %}
 
-{% block title %}仪表盘 — Snell UFW Manager{% endblock %}
+{% block title %}仪表盘 — VPS UFW Firewall Manager{% endblock %}
 
 {% block content %}
-<div class="page-title">
-  <span class="icon">📊</span> 节点总览
-</div>
+<header class="page-header" style="margin-bottom: 24px;">
+  <div>
+    <h1 class="page-title">📊 节点总览</h1>
+    <p class="page-subtitle">中央控制台与边缘中转节点防火墙状态</p>
+  </div>
+  <!-- Quick Refresh Action -->
+  <button 
+    class="btn btn-primary"
+    onclick="window.location.reload();"
+  >
+    🔄 刷新页面
+  </button>
+</header>
 
 <!-- Node Cards Grid -->
 <div class="node-grid">
   {% for node in nodes %}
-  <a href="/nodes/{{ node.id }}" style="text-decoration:none;color:inherit;">
-    <div class="node-card">
-      <div class="node-card-header">
-        <span class="status-dot unknown"
-              hx-get="/api/nodes/{{ node.id }}/ping"
-              hx-trigger="load"
-              hx-swap="outerHTML"></span>
+  <a href="/nodes/{{ node.id }}" style="text-decoration: none; color: inherit; display: block;">
+    <div 
+      class="glass-card" 
+      id="node-card-{{ node.id }}" 
+      hx-get="/api/nodes/{{ node.id }}/summary" 
+      hx-trigger="load" 
+      hx-swap="outerHTML"
+      style="min-height: 180px; display: flex; flex-direction: column; justify-content: center;"
+    >
+      <!-- Loading Skeleton -->
+      <div class="node-card-header" style="margin-bottom: 12px;">
         <span class="node-card-name">{{ node.name }}</span>
+        <span class="spinner"></span>
       </div>
       <div class="node-card-meta">
-        <div class="row">
-          <span>🌐</span>
-          <span class="mono">{{ node.host }}</span>
-        </div>
-        <div class="row">
-          <span>🔌</span>
-          <span>Snell: <strong class="mono">{{ node.snell_port }}</strong></span>
-        </div>
-        {% if node.remark %}
-        <div class="row">
-          <span>📝</span>
-          <span>{{ node.remark }}</span>
-        </div>
-        {% endif %}
-      </div>
-      <div class="node-card-actions">
-        <span class="btn btn-secondary btn-sm">管理 →</span>
+        <div class="row">🌐 <span class="mono">{{ node.host }}</span></div>
+        <div class="row text-secondary" style="font-size: 0.85rem; font-style: italic;">正在获取 UFW 状态...</div>
       </div>
     </div>
   </a>
   {% else %}
-  <div class="empty-state" style="grid-column: 1 / -1;">
-    <div class="icon">🖥️</div>
-    <p>还没有节点，去 <a href="/nodes/manage">节点管理</a> 添加一个</p>
+  <div class="glass-card empty-state" style="grid-column: 1 / -1; padding: 40px; text-align: center;">
+    <div style="font-size: 2.5rem; margin-bottom: 12px;">🖥️</div>
+    <p style="color: var(--text-secondary); margin-bottom: 16px;">当前没有配置任何 VPS 节点。</p>
+    <a href="/nodes/manage" class="btn btn-primary">➕ 添加第一个节点</a>
   </div>
   {% endfor %}
 </div>
 
 <!-- Recent Operations -->
-<div class="card">
-  <div class="card-header">
-    <div class="card-title">
-      <span>📋</span> 最近操作
-      <span class="count">{{ logs | length }}</span>
-    </div>
-    <a href="/logs" class="btn btn-ghost btn-sm">查看全部 →</a>
+<div class="glass-card" style="padding: 24px; margin-top: 32px;">
+  <div class="section-header" style="margin-bottom: 16px;">
+    <h3 style="font-size: 1.25rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+      <span>📋</span> 最近操作记录
+      <span class="badge" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); padding: 2px 8px; border-radius: 20px; font-size: 0.8rem; font-weight: 500;">{{ logs | length }}</span>
+    </h3>
+    <a href="/logs" class="btn btn-ghost btn-sm">查看全部操作 →</a>
   </div>
+  
   {% if logs %}
   <div class="table-wrap">
     <table>
       <thead>
         <tr>
-          <th>时间</th>
-          <th>节点</th>
-          <th>操作</th>
-          <th>目标</th>
-          <th>状态</th>
+          <th>操作时间</th>
+          <th>节点名称</th>
+          <th>操作类型</th>
+          <th>操作目标</th>
+          <th>详情描述</th>
+          <th>操作状态</th>
         </tr>
       </thead>
       <tbody>
         {% for log in logs %}
         <tr>
-          <td class="text-secondary text-sm">{{ log.created_at }}</td>
-          <td>{{ log.node_name or '—' }}</td>
-          <td><span class="tag tag-info">{{ log.action }}</span></td>
-          <td class="mono">{{ log.target or '—' }}</td>
+          <td class="text-secondary text-sm" style="font-size: 0.85rem; color: var(--text-secondary);">{{ log.created_at }}</td>
+          <td style="font-weight: 600;">{{ log.node_name or '—' }}</td>
+          <td>
+            <span class="tag tag-info" style="font-size: 0.72rem; padding: 2px 8px;">{{ log.action }}</span>
+          </td>
+          <td class="mono" style="font-size: 0.85rem; color: var(--accent-purple);">{{ log.target or '—' }}</td>
+          <td style="color: var(--text-secondary); max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ log.detail or '—' }}</td>
           <td>
             {% if log.success %}
-              <span class="tag tag-allow">✓ 成功</span>
+              <span class="tag tag-allow" style="font-size: 0.72rem; padding: 2px 8px;">✓ 成功</span>
             {% else %}
-              <span class="tag tag-block">✗ 失败</span>
+              <span class="tag tag-block" style="font-size: 0.72rem; padding: 2px 8px;">✗ 失败</span>
             {% endif %}
           </td>
         </tr>
@@ -90,7 +96,7 @@
     </table>
   </div>
   {% else %}
-  <div class="empty-state">
+  <div class="empty-state" style="padding: 24px; text-align: center; color: var(--text-muted);">
     <p>暂无操作记录</p>
   </div>
   {% endif %}
