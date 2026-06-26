@@ -216,6 +216,15 @@ async def node_detail(request: Request, node_id: int):
     node = await db.get_node(node_id)
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
+        
+    # Resolve country if missing
+    if not node.get("country") or node.get("country") == "未知" or node.get("country") == "未知地区" or not node.get("country_code"):
+        country, country_code = await get_ip_country(node["host"])
+        if country != "未知地区" or country_code != "XX":
+            await db.update_node(node["id"], country=country, country_code=country_code)
+            node["country"] = country
+            node["country_code"] = country_code
+            
     ip_groups = await db.get_all_ip_groups()
     return templates.TemplateResponse(
         "node_detail.html",
@@ -368,8 +377,8 @@ async def api_open_port(
     port: int = Form(...),
     protocol: str = Form("both"),
     tag: str = Form("Custom Rule"),
-    initial_ip: str | None = Form(None),
-    initial_ip_group_id: int | None = Form(None),
+    initial_ip: str = Form(""),
+    initial_ip_group_id: str = Form(""),
 ):
     """Open a UFW service port and return updated Port Cards Grid."""
     node = await db.get_node(node_id)
@@ -379,6 +388,13 @@ async def api_open_port(
     if port < 1 or port > 65535:
         raise HTTPException(status_code=400, detail="Invalid port number")
 
+    parsed_group_id = None
+    if initial_ip_group_id.strip():
+        try:
+            parsed_group_id = int(initial_ip_group_id)
+        except ValueError:
+            pass
+
     success = True
     added_targets = []
     error_msg = ""
@@ -387,8 +403,8 @@ async def api_open_port(
     targets = []
     if initial_ip and initial_ip.strip():
         targets.append((initial_ip.strip(), "Initial IP"))
-    elif initial_ip_group_id:
-        group = await db.get_ip_group(initial_ip_group_id)
+    elif parsed_group_id:
+        group = await db.get_ip_group(parsed_group_id)
         if group:
             for item in group.get("ips", []):
                 targets.append((item["ip_cidr"], f"Group: {group['name']}"))
