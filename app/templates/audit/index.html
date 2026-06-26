@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>操作日志</h1>
+    <p>记录控制台里的创建、修改、下发、远端执行等操作。敏感字段会自动脱敏。</p>
+  </div>
+</div>
+<section class="panel">
+<div class="table-wrap">
+<table>
+  <thead><tr><th>ID</th><th>动作</th><th>摘要</th><th>结果</th></tr></thead>
+  <tbody>
+    {% for item in audit_logs %}
+    <tr>
+      <td>{{ item.id }}</td>
+      <td>{{ item.action }}</td>
+      <td>{{ item.summary }}</td>
+      <td><span class="badge {{ 'badge-ok' if item.success else 'badge-warn' }}">{{ "成功" if item.success else "失败" }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</section>
+{% endblock %}

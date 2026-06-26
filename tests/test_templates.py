@@ -1,0 +1,36 @@
+from __future__ import annotations
+
+from fastapi.testclient import TestClient
+
+from app.main import create_app
+
+
+def authenticated_client(monkeypatch) -> TestClient:
+    monkeypatch.setenv("ADMIN_TOKEN", "test-admin-token")
+    client = TestClient(create_app())
+    client.post("/login", data={"admin_token": "test-admin-token"})
+    return client
+
+
+def test_dashboard_renders_local_only_product_name(monkeypatch) -> None:
+    client = authenticated_client(monkeypatch)
+
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert "snell-ufw-control" in response.text
+    assert "127.0.0.1:8899" in response.text
+
+
+def test_core_skeleton_pages_render(monkeypatch) -> None:
+    client = authenticated_client(monkeypatch)
+
+    for path, label in [
+        ("/nodes", "节点"),
+        ("/relay-groups", "中转组"),
+        ("/policies", "访问策略"),
+        ("/audit-logs", "操作日志"),
+    ]:
+        response = client.get(path)
+        assert response.status_code == 200
+        assert label in response.text

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>访问策略</h1>
+    <p>把一个或多个中转组应用到指定节点，生成 Snell 端口的 TCP/UDP UFW 白名单。</p>
+  </div>
+</div>
+<section class="panel">
+<div class="section-title">
+  <h2>绑定策略</h2>
+</div>
+<form method="post" action="/policies" class="inline-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>节点
+    <select name="node_id">
+      {% for node in nodes %}
+      <option value="{{ node.id }}">{{ node.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>中转组
+    <select name="relay_group_id">
+      {% for group in relay_groups %}
+      <option value="{{ group.id }}">{{ group.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="check"><input name="enabled" type="checkbox" checked> 启用</label>
+  <button type="submit">绑定策略</button>
+</form>
+</section>
+
+<section class="panel">
+<div class="section-title">
+  <h2>策略列表</h2>
+  <span class="muted">{{ policies|length }} 条策略</span>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>节点</th><th>中转组</th><th>状态</th></tr></thead>
+  <tbody>
+    {% for policy in policies %}
+    <tr>
+      <td>{{ policy.node.name }}</td>
+      <td>{{ policy.relay_group.name }}</td>
+      <td><span class="badge {{ 'badge-ok' if policy.enabled else 'badge-off' }}">{{ "启用" if policy.enabled else "停用" }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</section>
+
+{% for node in nodes %}
+<section class="panel">
+  <div class="section-title">
+    <h2>{{ node.name }} 规则预览</h2>
+    <span class="muted">port {{ node.snell_port }}</span>
+  </div>
+  <ul class="code-list">
+    {% for rule in previews[node.id].rules %}
+    <li>{{ rule.source }} {{ rule.proto }} {{ rule.comment }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% endblock %}

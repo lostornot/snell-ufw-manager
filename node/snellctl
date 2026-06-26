@@ -1,0 +1,351 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+ALLOWED_SUBCOMMANDS = {
+    "install",
+    "status",
+    "start",
+    "stop",
+    "restart",
+    "config-get",
+    "config-apply",
+    "logs",
+    "backup",
+    "restore",
+}
+
+
+def emit(ok: bool, data: dict[str, Any] | None, error: dict[str, str] | None) -> None:
+    print(json.dumps({"ok": ok, "data": data or {}, "error": error}, separators=(",", ":")))
+
+
+def fail(code: str, message: str, returncode: int = 2) -> int:
+    emit(False, {}, {"code": code, "message": message})
+    return returncode
+
+
+def read_payload() -> dict[str, Any] | list[Any]:
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {}
+    payload = json.loads(raw)
+    if not isinstance(payload, (dict, list)):
+        raise ValueError("payload must be a JSON object or array")
+    return payload
+
+
+def ensure_pinned_version(payload: dict[str, Any]) -> str:
+    version = str(payload.get("snell_version") or "").strip()
+    if not version or version.lower() == "latest":
+        raise ValueError("Snell version must be explicit; latest is not allowed")
+    return version
+
+
+def path_from_payload(payload: dict[str, Any], key: str, default: str) -> Path:
+    return Path(str(payload.get(key) or default))
+
+
+def service_name(payload: dict[str, Any]) -> str:
+    return str(payload.get("service_name") or "snell")
+
+
+def systemctl_commands(payload: dict[str, Any], action: str) -> list[list[str]]:
+    return [["systemctl", action, service_name(payload)]]
+
+
+def run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, text=True, capture_output=True, timeout=60)
+
+
+def write_service_file(service_path: Path, install_path: Path, config_path: Path, service: str) -> None:
+    service_path.parent.mkdir(parents=True, exist_ok=True)
+    service_path.write_text(
+        "\n".join(
+            [
+                "[Unit]",
+                "Description=Snell Server",
+                "After=network.target",
+                "",
+                "[Service]",
+                "Type=simple",
+                f"ExecStart={install_path} -c {config_path}",
+                "Restart=on-failure",
+                "RestartSec=3",
+                "",
+                "[Install]",
+                "WantedBy=multi-user.target",
+                "",
+            ]
+        )
+    )
+
+
+def install_command_plan(payload: dict[str, Any], install_path: Path) -> list[list[str]]:
+    custom_binary = payload.get("custom_binary_path")
+    commands: list[list[str]] = []
+    if custom_binary:
+        commands.append(["install", "-m", "0755", str(custom_binary), str(install_path)])
+    elif payload.get("snell_download_url"):
+        commands.append(["curl", "-fsSL", str(payload["snell_download_url"]), "-o", str(install_path)])
+        commands.append(["chmod", "0755", str(install_path)])
+    commands.extend(
+        [
+            ["systemctl", "daemon-reload"],
+            ["systemctl", "enable", service_name(payload)],
+            ["systemctl", "restart", service_name(payload)],
+            ["systemctl", "is-active", service_name(payload)],
+        ]
+    )
+    return commands
+
+
+def handle_install(payload: dict[str, Any]) -> int:
+    try:
+        version = ensure_pinned_version(payload)
+    except ValueError as exc:
+        return fail("SNELL_VERSION_NOT_PINNED", str(exc))
+    install_path = path_from_payload(payload, "install_path", "/usr/local/bin/snell-server")
+    config_path = path_from_payload(payload, "config_path", "/etc/snell/snell-server.conf")
+    service_path = path_from_payload(payload, "service_path", f"/etc/systemd/system/{service_name(payload)}.service")
+    backup_dir = path_from_payload(payload, "backup_dir", "/var/backups/snell-ufw-control/snell")
+    commands = install_command_plan(payload, install_path)
+
+    if payload.get("dry_run"):
+        emit(
+            True,
+            {
+                "namespace": "snell",
+                "subcommand": "install",
+                "version": version,
+                "arch": payload.get("snell_arch"),
+                "would_install": True,
+                "installed": False,
+                "commands": commands,
+                "dry_run": True,
+            },
+            None,
+        )
+        return 0
+
+    if not payload.get("custom_binary_path") and not payload.get("snell_download_url"):
+        return fail("SNELL_BINARY_SOURCE_REQUIRED", "custom_binary_path or snell_download_url is required")
+
+    backup_path = backup_existing_config(config_path, backup_dir)
+    if payload.get("custom_binary_path"):
+        install_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(str(payload["custom_binary_path"])), install_path)
+        os.chmod(install_path, 0o755)
+    else:
+        completed = run_command(["curl", "-fsSL", str(payload["snell_download_url"]), "-o", str(install_path)])
+        if completed.returncode != 0:
+            return fail("SNELL_DOWNLOAD_FAILED", completed.stderr or "download failed")
+        os.chmod(install_path, 0o755)
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(str(payload.get("config_text", "")))
+    write_service_file(service_path, install_path, config_path, service_name(payload))
+
+    if not payload.get("skip_systemctl"):
+        for command in commands[-4:]:
+            completed = run_command(command)
+            if completed.returncode != 0:
+                if backup_path is not None:
+                    config_path.write_text(backup_path.read_text())
+                return fail("SNELL_INSTALL_FAILED", completed.stderr or f"command failed: {command}")
+
+    emit(
+        True,
+        {
+            "namespace": "snell",
+            "subcommand": "install",
+            "version": version,
+            "arch": payload.get("snell_arch"),
+            "would_install": True,
+            "installed": True,
+            "install_path": str(install_path),
+            "config_path": str(config_path),
+            "service_path": str(service_path),
+            "backup_path": str(backup_path) if backup_path else None,
+            "commands": commands,
+            "dry_run": False,
+        },
+        None,
+    )
+    return 0
+
+
+def backup_existing_config(config_path: Path, backup_dir: Path) -> Path | None:
+    if not config_path.exists():
+        return None
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    backup_path = backup_dir / f"{config_path.name}.{stamp}.bak"
+    backup_path.write_text(config_path.read_text())
+    return backup_path
+
+
+def handle_config_apply(payload: dict[str, Any]) -> int:
+    config_path = path_from_payload(payload, "config_path", "/etc/snell/snell-server.conf")
+    backup_dir = path_from_payload(payload, "backup_dir", "/var/backups/snell-ufw-control/snell")
+    config_text = str(payload.get("config_text", ""))
+    backup_path = backup_existing_config(config_path, backup_dir)
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path.write_text(config_text)
+
+    if not payload.get("skip_systemctl") and not payload.get("dry_run"):
+        completed = run_command(["systemctl", "restart", service_name(payload)])
+        if completed.returncode != 0:
+            if backup_path is not None:
+                config_path.write_text(backup_path.read_text())
+            return fail("SNELL_RESTART_FAILED", completed.stderr or "Snell restart failed; configuration rolled back")
+
+    if payload.get("restart_success", True) is False:
+        if backup_path is not None:
+            config_path.write_text(backup_path.read_text())
+        return fail("SNELL_RESTART_FAILED", "Snell restart failed; configuration rolled back")
+
+    emit(
+        True,
+        {
+            "namespace": "snell",
+            "subcommand": "config-apply",
+            "backup_path": str(backup_path) if backup_path else None,
+            "config_path": str(config_path),
+        },
+        None,
+    )
+    return 0
+
+
+def normalize_status(active: str) -> str:
+    if active == "active":
+        return "running"
+    if active in {"inactive", "failed"}:
+        return active
+    return "unknown"
+
+
+def handle_status(payload: dict[str, Any]) -> int:
+    active = str(payload.get("systemctl_active", "unknown"))
+    if payload.get("probe_system") and not payload.get("dry_run"):
+        completed = run_command(["systemctl", "is-active", service_name(payload)])
+        active = completed.stdout.strip() if completed.returncode == 0 else "failed"
+    emit(
+        True,
+        {
+            "namespace": "snell",
+            "subcommand": "status",
+            "status": normalize_status(active),
+            "systemctl_active": active,
+            "version": payload.get("version"),
+            "port": payload.get("port"),
+        },
+        None,
+    )
+    return 0
+
+
+def handle_service_action(subcommand: str, payload: dict[str, Any]) -> int:
+    commands = systemctl_commands(payload, subcommand)
+    if not payload.get("dry_run"):
+        completed = run_command(commands[0])
+        if completed.returncode != 0:
+            return fail("SNELL_SERVICE_COMMAND_FAILED", completed.stderr or f"{subcommand} failed")
+    emit(True, {"namespace": "snell", "subcommand": subcommand, "commands": commands}, None)
+    return 0
+
+
+def handle_config_get(payload: dict[str, Any]) -> int:
+    config_path = path_from_payload(payload, "config_path", "/etc/snell/snell-server.conf")
+    try:
+        config_text = config_path.read_text()
+    except OSError as exc:
+        return fail("SNELL_CONFIG_READ_FAILED", str(exc))
+    emit(True, {"namespace": "snell", "subcommand": "config-get", "config_text": config_text}, None)
+    return 0
+
+
+def handle_restore(payload: dict[str, Any]) -> int:
+    backup_path = Path(str(payload["backup_path"]))
+    config_path = path_from_payload(payload, "config_path", "/etc/snell/snell-server.conf")
+    try:
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(backup_path, config_path)
+    except OSError as exc:
+        return fail("SNELL_RESTORE_FAILED", str(exc))
+    commands = [["systemctl", "restart", service_name(payload)]]
+    if not payload.get("skip_systemctl") and not payload.get("dry_run"):
+        completed = run_command(commands[0])
+        if completed.returncode != 0:
+            return fail("SNELL_RESTART_FAILED", completed.stderr or "restart after restore failed")
+    emit(True, {"namespace": "snell", "subcommand": "restore", "config_path": str(config_path), "commands": commands}, None)
+    return 0
+
+
+def handle_logs(payload: dict[str, Any]) -> int:
+    if payload.get("log_text") is not None:
+        emit(True, {"namespace": "snell", "subcommand": "logs", "logs": str(payload["log_text"])}, None)
+        return 0
+    lines = str(payload.get("lines", 100))
+    commands = [["journalctl", "-u", service_name(payload), "--no-pager", "-n", lines]]
+    if payload.get("dry_run"):
+        emit(True, {"namespace": "snell", "subcommand": "logs", "commands": commands}, None)
+        return 0
+    completed = run_command(commands[0])
+    if completed.returncode != 0:
+        return fail("SNELL_LOGS_FAILED", completed.stderr or "journalctl failed")
+    emit(True, {"namespace": "snell", "subcommand": "logs", "logs": completed.stdout, "commands": commands}, None)
+    return 0
+
+
+def handle_backup(payload: dict[str, Any]) -> int:
+    config_path = path_from_payload(payload, "config_path", "/etc/snell/snell-server.conf")
+    backup_dir = path_from_payload(payload, "backup_dir", "/var/backups/snell-ufw-control/snell")
+    backup_path = backup_existing_config(config_path, backup_dir)
+    emit(True, {"namespace": "snell", "subcommand": "backup", "backup_path": str(backup_path) if backup_path else None}, None)
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2 or argv[1] not in ALLOWED_SUBCOMMANDS:
+        emit(False, {}, {"code": "UNKNOWN_SUBCOMMAND", "message": "unknown snell subcommand"})
+        return 2
+    try:
+        payload = read_payload()
+    except (ValueError, json.JSONDecodeError) as exc:
+        emit(False, {}, {"code": "INVALID_JSON", "message": str(exc)})
+        return 2
+
+    subcommand = argv[1]
+    if isinstance(payload, dict) and subcommand == "install":
+        return handle_install(payload)
+    if isinstance(payload, dict) and subcommand == "config-apply":
+        return handle_config_apply(payload)
+    if isinstance(payload, dict) and subcommand == "status":
+        return handle_status(payload)
+    if isinstance(payload, dict) and subcommand in {"start", "stop", "restart"}:
+        return handle_service_action(subcommand, payload)
+    if isinstance(payload, dict) and subcommand == "config-get":
+        return handle_config_get(payload)
+    if isinstance(payload, dict) and subcommand == "restore":
+        return handle_restore(payload)
+    if isinstance(payload, dict) and subcommand == "logs":
+        return handle_logs(payload)
+    if isinstance(payload, dict) and subcommand == "backup":
+        return handle_backup(payload)
+
+    emit(True, {"namespace": "snell", "subcommand": subcommand, "payload": payload}, None)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

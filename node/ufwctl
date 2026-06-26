@@ -1,0 +1,358 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import re
+import shutil
+import subprocess
+import sys
+from collections import OrderedDict
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+ALLOWED_SUBCOMMANDS = {"list", "apply", "backup", "restore", "candidates", "enable"}
+MANAGED_COMMENT_RE = re.compile(
+    r"^snell-control:node:(?P<node_id>\d+):group:(?P<group_id>\d+):"
+    r"port:(?P<port>\d+):proto:(?P<proto>tcp|udp)$"
+)
+NUMBERED_RULE_RE = re.compile(
+    r"^\[\s*(?P<number>\d+)\]\s+"
+    r"(?P<port>\d+)(?:/(?P<proto>tcp|udp))?\s+"
+    r"(?P<action>ALLOW|DENY|REJECT)\s+IN\s+"
+    r"(?P<source>[^#]+?)"
+    r"(?:\s+#\s*(?P<comment>.*))?$",
+    re.IGNORECASE,
+)
+UFW_LOG_RE = re.compile(
+    r"SRC=(?P<src>\S+).*?PROTO=(?P<proto>TCP|UDP).*?DPT=(?P<dpt>\d+)",
+    re.IGNORECASE,
+)
+
+
+def emit(ok: bool, data: dict[str, Any] | None, error: dict[str, str] | None) -> None:
+    print(json.dumps({"ok": ok, "data": data or {}, "error": error}, separators=(",", ":")))
+
+
+def read_payload() -> dict[str, Any] | list[Any]:
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {}
+    payload = json.loads(raw)
+    if not isinstance(payload, (dict, list)):
+        raise ValueError("payload must be a JSON object or array")
+    return payload
+
+
+def ufw_is_active(payload: dict[str, Any]) -> bool:
+    return str(payload.get("ufw_status", "")).lower() == "active"
+
+
+def run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(command, text=True, capture_output=True, timeout=30)
+
+
+def parse_ufw_status_numbered(text: str) -> dict[str, Any]:
+    active = False
+    default_incoming = None
+    ssh_allowed = False
+    managed_rules: list[dict[str, Any]] = []
+    all_rules: list[dict[str, Any]] = []
+
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.lower().startswith("status:"):
+            active = "active" in line.lower()
+            continue
+        if line.lower().startswith("default:"):
+            match = re.search(r"Default:\s*([a-z]+)\s*\(incoming\)", line, re.IGNORECASE)
+            if match:
+                default_incoming = match.group(1).lower()
+            continue
+        match = NUMBERED_RULE_RE.match(line)
+        if not match:
+            continue
+        rule = {
+            "number": int(match.group("number")),
+            "action": match.group("action").lower(),
+            "port": int(match.group("port")),
+            "proto": (match.group("proto") or "tcp").lower(),
+            "comment": (match.group("comment") or "").strip(),
+            "from": match.group("source").strip(),
+        }
+        all_rules.append(rule)
+        if rule["port"] == 22 and rule["action"] == "allow":
+            ssh_allowed = True
+        if parse_managed_comment(rule["comment"]):
+            managed_rules.append(rule)
+
+    return {
+        "active": active,
+        "default_incoming": default_incoming,
+        "ssh_allowed": ssh_allowed,
+        "managed_rules": managed_rules,
+        "existing_rules": all_rules,
+    }
+
+
+def list_status(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    if not payload:
+        return 0, {
+            "active": False,
+            "default_incoming": None,
+            "ssh_allowed": False,
+            "managed_rules": [],
+            "warnings": ["UFW inactive: current whitelist rules are not enforcing access."],
+        }
+    if payload.get("ufw_status_output"):
+        parsed = parse_ufw_status_numbered(str(payload["ufw_status_output"]))
+        warnings: list[str] = []
+        if not parsed["active"]:
+            warnings.append("UFW inactive: current whitelist rules are not enforcing access.")
+        return 0, parsed | {"warnings": warnings}
+    if not payload.get("dry_run") and payload.get("probe_system"):
+        completed = run_command(["ufw", "status", "numbered"])
+        if completed.returncode != 0:
+            return completed.returncode, {
+                "active": False,
+                "default_incoming": None,
+                "ssh_allowed": False,
+                "managed_rules": [],
+                "warnings": [completed.stderr or "ufw status failed"],
+            }
+        parsed = parse_ufw_status_numbered(completed.stdout)
+        warnings = []
+        if not parsed["active"]:
+            warnings.append("UFW inactive: current whitelist rules are not enforcing access.")
+        return 0, parsed | {"warnings": warnings}
+
+    active = ufw_is_active(payload)
+    warnings = list(payload.get("warnings", []))
+    if not active:
+        warnings.append("UFW inactive: current whitelist rules are not enforcing access.")
+    return 0, {
+        "active": active,
+        "default_incoming": payload.get("default_incoming"),
+        "ssh_allowed": bool(payload.get("ssh_allowed", False)),
+        "managed_rules": payload.get("managed_rules", []),
+        "warnings": warnings,
+    }
+
+
+def parse_managed_comment(comment: str) -> dict[str, Any] | None:
+    match = MANAGED_COMMENT_RE.fullmatch(comment.strip())
+    if not match:
+        return None
+    return {
+        "node_id": int(match.group("node_id")),
+        "group_id": int(match.group("group_id")),
+        "port": int(match.group("port")),
+        "proto": match.group("proto"),
+    }
+
+
+def matching_managed_rule(rule: dict[str, Any], node_id: int, port: int, protocols: set[str]) -> bool:
+    if str(rule.get("action", "")).lower() != "allow":
+        return False
+    parsed = parse_managed_comment(str(rule.get("comment", "")))
+    if parsed is None:
+        return False
+    return parsed["node_id"] == node_id and parsed["port"] == port and parsed["proto"] in protocols
+
+
+def apply_rules(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    active = ufw_is_active(payload)
+    node_id = int(payload["node_id"])
+    port = int(payload["port"])
+    desired_rules = list(payload.get("rules", []))
+    protocols = {str(rule["proto"]) for rule in desired_rules}
+    protocols.update(str(proto) for proto in payload.get("protocols", []))
+    existing_rules = list(payload.get("existing_rules", []))
+    if payload.get("ufw_status_output"):
+        parsed = parse_ufw_status_numbered(str(payload["ufw_status_output"]))
+        active = parsed["active"]
+        existing_rules = parsed["existing_rules"]
+
+    matched_numbers = [
+        int(rule["number"])
+        for rule in existing_rules
+        if matching_managed_rule(rule, node_id, port, protocols or {"tcp", "udp"})
+    ]
+    matched = set(matched_numbers)
+    preserved_numbers = [
+        int(rule["number"])
+        for rule in existing_rules
+        if int(rule["number"]) not in matched
+    ]
+    warnings: list[str] = []
+    if not active:
+        warnings.append("UFW inactive: current whitelist rules are not enforcing access.")
+
+    delete_numbers = sorted(matched_numbers, reverse=True)
+    commands = build_apply_commands(delete_numbers, desired_rules, port, active)
+    if not payload.get("dry_run"):
+        backup_payload = {
+            "user_rules_path": payload.get("user_rules_path", "/etc/ufw/user.rules"),
+            "user6_rules_path": payload.get("user6_rules_path", "/etc/ufw/user6.rules"),
+            "backup_dir": payload.get("backup_dir", "/var/backups/snell-ufw-control"),
+        }
+        backup_rules(backup_payload)
+        for command in commands:
+            completed = run_command(command)
+            if completed.returncode != 0:
+                return completed.returncode, {
+                    "active": active,
+                    "delete_numbers": delete_numbers,
+                    "preserved_numbers": preserved_numbers,
+                    "add_rules": desired_rules,
+                    "commands": commands,
+                    "would_reload": active,
+                    "would_enable": False,
+                    "warnings": warnings,
+                    "error": completed.stderr,
+                }
+
+    return 0, {
+        "active": active,
+        "delete_numbers": delete_numbers,
+        "preserved_numbers": preserved_numbers,
+        "add_rules": desired_rules,
+        "commands": commands,
+        "would_reload": active,
+        "would_enable": False,
+        "warnings": warnings,
+    }
+
+
+def build_apply_commands(delete_numbers: list[int], desired_rules: list[dict[str, Any]], port: int, active: bool) -> list[list[str]]:
+    commands: list[list[str]] = []
+    for number in delete_numbers:
+        commands.append(["ufw", "--force", "delete", str(number)])
+    for rule in desired_rules:
+        commands.append(
+            [
+                "ufw",
+                "allow",
+                "proto",
+                str(rule["proto"]),
+                "from",
+                str(rule["source"]),
+                "to",
+                "any",
+                "port",
+                str(port),
+                "comment",
+                str(rule["comment"]),
+            ]
+        )
+    if active:
+        commands.append(["ufw", "reload"])
+    return commands
+
+
+def backup_rules(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    user_rules = Path(str(payload.get("user_rules_path", "/etc/ufw/user.rules")))
+    user6_rules = Path(str(payload.get("user6_rules_path", "/etc/ufw/user6.rules")))
+    backup_dir = Path(str(payload.get("backup_dir", "/var/backups/snell-ufw-control")))
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+    user_rules_backup = backup_dir / f"user.rules.{stamp}.bak"
+    user6_rules_backup = backup_dir / f"user6.rules.{stamp}.bak"
+    shutil.copy2(user_rules, user_rules_backup)
+    shutil.copy2(user6_rules, user6_rules_backup)
+    return 0, {
+        "user_rules_backup": str(user_rules_backup),
+        "user6_rules_backup": str(user6_rules_backup),
+    }
+
+
+def parse_candidates_from_log(log_text: str, port: int) -> list[dict[str, Any]]:
+    hits: OrderedDict[tuple[str, str], int] = OrderedDict()
+    for line in log_text.splitlines():
+        match = UFW_LOG_RE.search(line)
+        if not match:
+            continue
+        if int(match.group("dpt")) != port:
+            continue
+        key = (match.group("src"), match.group("proto").lower())
+        hits[key] = hits.get(key, 0) + 1
+    return [
+        {
+            "ip": ip,
+            "port": port,
+            "protocol": proto,
+            "source": "ufw",
+            "hit_count": count,
+        }
+        for (ip, proto), count in hits.items()
+    ]
+
+
+def candidates(payload: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+    port = int(payload["port"])
+    if payload.get("log_text") is not None:
+        return 0, {"candidates": parse_candidates_from_log(str(payload["log_text"]), port)}
+    if payload.get("dry_run"):
+        return 0, {"candidates": []}
+    completed = run_command(["journalctl", "-k", "--no-pager", "-n", str(payload.get("lines", 500))])
+    if completed.returncode != 0:
+        return completed.returncode, {"candidates": [], "error": completed.stderr}
+    return 0, {"candidates": parse_candidates_from_log(completed.stdout, port)}
+
+
+def enable_ufw(payload: dict[str, Any]) -> tuple[int, dict[str, Any] | None, dict[str, str] | None]:
+    if not payload.get("confirmed"):
+        return 2, None, {
+            "code": "UFW_ENABLE_UNCONFIRMED",
+            "message": "UFW enable requires explicit confirmation",
+        }
+    if not payload.get("ssh_allowed") or not payload.get("emergency_ssh_cidr"):
+        return 2, None, {
+            "code": "UFW_ENABLE_UNSAFE",
+            "message": "refusing to enable UFW without safe SSH access",
+        }
+    return 0, {"would_enable": True, "dry_run": bool(payload.get("dry_run"))}, None
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2 or argv[1] not in ALLOWED_SUBCOMMANDS:
+        emit(False, {}, {"code": "UNKNOWN_SUBCOMMAND", "message": "unknown ufw subcommand"})
+        return 2
+    try:
+        payload = read_payload()
+    except (ValueError, json.JSONDecodeError) as exc:
+        emit(False, {}, {"code": "INVALID_JSON", "message": str(exc)})
+        return 2
+
+    subcommand = argv[1]
+    if isinstance(payload, dict) and subcommand == "list":
+        returncode, data = list_status(payload)
+        emit(True, data | {"namespace": "ufw", "subcommand": subcommand}, None)
+        return returncode
+    if isinstance(payload, dict) and subcommand == "apply":
+        returncode, data = apply_rules(payload)
+        emit(True, data | {"namespace": "ufw", "subcommand": subcommand}, None)
+        return returncode
+    if isinstance(payload, dict) and subcommand == "backup":
+        try:
+            returncode, data = backup_rules(payload)
+        except OSError as exc:
+            emit(False, {}, {"code": "UFW_BACKUP_FAILED", "message": str(exc)})
+            return 2
+        emit(True, data | {"namespace": "ufw", "subcommand": subcommand}, None)
+        return returncode
+    if isinstance(payload, dict) and subcommand == "candidates":
+        returncode, data = candidates(payload)
+        emit(returncode == 0, data | {"namespace": "ufw", "subcommand": subcommand}, None if returncode == 0 else {"code": "UFW_CANDIDATES_FAILED", "message": data.get("error", "failed")})
+        return returncode
+    if isinstance(payload, dict) and subcommand == "enable":
+        returncode, data, error = enable_ufw(payload)
+        emit(error is None, data or {}, error)
+        return returncode
+
+    emit(True, {"namespace": "ufw", "subcommand": subcommand, "payload": payload}, None)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

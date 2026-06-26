@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ node.name }}</h1>
+    <p>{{ node.ssh_alias or node.host }} · Snell {{ node.snell_port }} · 只管理带 snell-control 标记的 UFW 规则</p>
+  </div>
+  <a href="/nodes">返回节点列表</a>
+</div>
+<dl class="stats">
+  <div><dt>连接入口</dt><dd>{{ node.ssh_alias or node.host }}</dd></div>
+  <div><dt>Snell 端口</dt><dd>{{ node.snell_port }}</dd></div>
+  <div><dt>服务状态</dt><dd>{{ node.last_status or "未知" }}</dd></div>
+  <div><dt>协议</dt><dd>{% if node.enable_tcp %}tcp {% endif %}{% if node.enable_udp %}udp{% endif %}</dd></div>
+</dl>
+
+{% if node.last_error %}
+<p class="error">{{ node.last_error }}</p>
+{% endif %}
+
+<section class="panel">
+  <div class="section-title">
+    <h2>节点设置</h2>
+    <span class="badge {{ 'badge-ok' if node.enabled else 'badge-off' }}">{{ "启用" if node.enabled else "停用" }}</span>
+  </div>
+  <form method="post" action="/nodes/{{ node.id }}/edit" class="grid-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>节点名称 <input name="name" value="{{ node.name }}" required></label>
+    <label>主机地址 <input name="host" value="{{ node.host or '' }}"></label>
+    <label>SSH Alias <input name="ssh_alias" value="{{ node.ssh_alias or '' }}"></label>
+    <label>SSH 端口 <input name="ssh_port" type="number" value="{{ node.ssh_port or 22 }}" min="1" max="65535"></label>
+    <label>SSH 用户 <input name="ssh_user" value="{{ node.ssh_user or 'snellmgr' }}"></label>
+    <label>Snell 端口 <input name="snell_port" type="number" value="{{ node.snell_port }}" min="1" max="65535" required></label>
+    <label>Snell 版本 <input name="snell_version" value="{{ node.snell_version or '' }}"></label>
+    <label>PSK <input name="psk" type="password" value="{{ node.psk or '' }}"></label>
+    <label class="check"><input name="enable_tcp" type="checkbox" {% if node.enable_tcp %}checked{% endif %}> TCP</label>
+    <label class="check"><input name="enable_udp" type="checkbox" {% if node.enable_udp %}checked{% endif %}> UDP</label>
+    <label class="check"><input name="enabled" type="checkbox" {% if node.enabled %}checked{% endif %}> 启用</label>
+    <label class="wide">备注 <input name="remark" value="{{ node.remark or '' }}"></label>
+    <button type="submit">保存节点</button>
+  </form>
+  <form method="post" action="/nodes/{{ node.id }}/delete" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="button-danger">删除节点</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-title">
+    <h2>期望 Snell 配置</h2>
+    <span class="muted">保存后再点击“应用配置”下发到节点</span>
+  </div>
+  <form method="post" action="/nodes/{{ node.id }}/config" class="grid-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Snell 版本 <input name="snell_version" value="{{ node.snell_version or '' }}" placeholder="v5.0.1"></label>
+    <label>PSK <input name="psk" type="password" value="{{ node.psk or '' }}"></label>
+    <label class="wide">配置内容
+      <textarea name="desired_config_text" rows="8">{{ node.desired_config_text or '' }}</textarea>
+    </label>
+    <button type="submit">保存配置</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-title">
+    <h2>Snell 操作</h2>
+    <span class="badge">受限 snell-fwctl</span>
+  </div>
+  <form method="post" action="/nodes/{{ node.id }}/install-snell" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>自定义二进制 <input name="custom_binary_path" placeholder="/tmp/snell-server"></label>
+    <label>下载地址 <input name="snell_download_url" placeholder="https://..."></label>
+    <button type="submit">安装 Snell</button>
+  </form>
+  <div class="button-row">
+    <form method="post" action="/nodes/{{ node.id }}/refresh-status">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="button-secondary">刷新状态</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/snell-start">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">启动</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/snell-stop">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="button-secondary">停止</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/snell-restart">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">重启</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/snell-config-get">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="button-secondary">读取配置</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/apply-config">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">应用配置</button>
+    </form>
+  </div>
+  <form method="post" action="/nodes/{{ node.id }}/snell-logs" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>日志行数 <input name="lines" type="number" value="100" min="1" max="1000"></label>
+    <button type="submit" class="button-secondary">读取日志</button>
+  </form>
+  <form method="post" action="/nodes/{{ node.id }}/snell-restore" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>备份路径 <input name="backup_path" required></label>
+    <button type="submit" class="button-danger">恢复配置</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-title">
+    <h2>UFW 白名单</h2>
+    <span class="muted">只管理 snell-control 规则</span>
+  </div>
+  <div class="button-row">
+    <form method="post" action="/nodes/{{ node.id }}/ufw-list">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="button-secondary">查看远端规则</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/apply-ufw">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">应用白名单</button>
+    </form>
+    <form method="post" action="/nodes/{{ node.id }}/candidates">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit" class="button-secondary">刷新疑似来源</button>
+    </form>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-title">
+    <h2>当前 Snell UFW 白名单</h2>
+    <span class="muted">最近一次远端读取结果</span>
+  </div>
+  {% if latest_ufw_list %}
+    {% set ufw_data = latest_ufw_list.data %}
+    {% if ufw_data and ufw_data.active == false %}
+    <p class="warning">UFW 未启用：当前白名单规则不会真正限制访问。</p>
+    {% endif %}
+    {% if ufw_data %}
+    <p class="muted">默认入站策略：{{ ufw_data.default_incoming or "未知" }}</p>
+    <div class="table-wrap">
+    <table>
+      <thead><tr><th>来源</th><th>协议</th><th>端口</th><th>规则标记</th></tr></thead>
+      <tbody>
+        {% for rule in ufw_data.managed_rules or [] %}
+        <tr>
+          <td>{{ rule.source }}</td>
+          <td>{{ rule.proto }}</td>
+          <td>{{ rule.port }}</td>
+          <td>{{ rule.comment }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+  {% else %}
+    <p class="muted">还没有读取过远端 UFW 规则。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-title">
+    <h2>策略预览</h2>
+    <span class="muted">即将写入的 managed rules</span>
+  </div>
+  <ul class="code-list">
+    {% for rule in policy_preview.rules %}
+    <li>{{ rule.source }} {{ rule.proto }} {{ rule.comment }}</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="panel">
+  <h2>疑似访问来源 / Access Candidates</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>IP</th><th>协议</th><th>端口</th><th>命中</th><th>来源</th><th>首次出现</th><th>最近出现</th><th>加入中转组</th></tr></thead>
+    <tbody>
+      {% for candidate in candidates %}
+      <tr>
+        <td>{{ candidate.ip }}</td>
+        <td>{{ candidate.protocol }}</td>
+        <td>{{ candidate.port }}</td>
+        <td>{{ candidate.hit_count }}</td>
+        <td>{{ candidate.source }}</td>
+        <td>{{ candidate.first_seen_at }}</td>
+        <td>{{ candidate.last_seen_at }}</td>
+        <td>
+          {% if candidate.promoted %}
+          <span class="badge badge-ok">已加入</span>
+          {% else %}
+          <form method="post" action="/nodes/{{ node.id }}/candidates/{{ candidate.id }}/promote" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <select name="relay_group_id" required>
+              {% for group in relay_groups %}
+              <option value="{{ group.id }}">{{ group.name }}</option>
+              {% endfor %}
+            </select>
+            <label class="check"><input name="confirmed" type="checkbox" required> 确认</label>
+            <button type="submit">加入</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>最近操作</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>动作</th><th>摘要</th><th>结果</th></tr></thead>
+    <tbody>
+      {% for item in audit_logs %}
+      <tr>
+        <td>{{ item.action }}</td>
+        <td>{{ item.summary }}</td>
+        <td><span class="badge {{ 'badge-ok' if item.success else 'badge-warn' }}">{{ "成功" if item.success else "失败" }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endblock %}

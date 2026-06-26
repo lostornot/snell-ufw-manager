@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>配置预设</h1>
+    <p>用于快速创建节点配置。预设不会自动覆盖已有节点，避免误改线上 Snell。</p>
+  </div>
+</div>
+<section class="panel">
+<div class="section-title">
+  <h2>添加预设</h2>
+</div>
+<form method="post" action="/profiles" class="grid-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>名称 <input name="name" required placeholder="默认 v5"></label>
+  <label>Snell 端口 <input name="snell_port" type="number" value="23456" min="1" max="65535" required></label>
+  <label>Snell 版本 <input name="snell_version" placeholder="v5.x"></label>
+  <label>PSK <input name="psk" type="password"></label>
+  <label class="check"><input name="enable_tcp" type="checkbox" checked> TCP</label>
+  <label class="check"><input name="enable_udp" type="checkbox" checked> UDP</label>
+  <label class="wide">配置内容 <textarea name="config_text" rows="5"></textarea></label>
+  <label class="wide">备注 <input name="remark"></label>
+  <button type="submit">添加预设</button>
+</form>
+</section>
+
+<section class="panel">
+<div class="section-title">
+  <h2>预设列表</h2>
+  <span class="muted">{{ profiles|length }} 个预设</span>
+</div>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>名称</th><th>版本</th><th>端口</th><th>协议</th></tr></thead>
+  <tbody>
+    {% for profile in profiles %}
+    <tr>
+      <td>{{ profile.name }}</td>
+      <td>{{ profile.snell_version or "" }}</td>
+      <td>{{ profile.snell_port }}</td>
+      <td>{% if profile.enable_tcp %}tcp {% endif %}{% if profile.enable_udp %}udp{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</section>
+{% endblock %}

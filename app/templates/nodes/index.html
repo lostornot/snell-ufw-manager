@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>节点</h1>
+    <p>这里只放 Snell 节点，不做通用 VPS 面板。优先使用 SSH Alias，密钥和跳板交给 OpenSSH 管理。</p>
+  </div>
+</div>
+<section class="panel">
+<div class="section-title">
+  <h2>添加节点</h2>
+  <span class="badge">snellmgr</span>
+</div>
+<form method="post" action="/nodes" class="grid-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>节点名称 <input name="name" required placeholder="东京 1"></label>
+  <label>主机地址 <input name="host" placeholder="203.0.113.10"></label>
+  <label>SSH Alias <input name="ssh_alias" placeholder="us-snell-1"></label>
+  <label>SSH 端口 <input name="ssh_port" type="number" value="22" min="1" max="65535"></label>
+  <label>SSH 用户 <input name="ssh_user" value="snellmgr"></label>
+  <label>Snell 端口 <input name="snell_port" type="number" value="23456" min="1" max="65535" required></label>
+  <label>Snell 版本 <input name="snell_version" placeholder="v5.x"></label>
+  <label>PSK <input name="psk" type="password"></label>
+  <label class="check"><input name="enable_tcp" type="checkbox" checked> TCP</label>
+  <label class="check"><input name="enable_udp" type="checkbox" checked> UDP</label>
+  <label class="check"><input name="enabled" type="checkbox" checked> 启用</label>
+  <label class="wide">备注 <input name="remark" placeholder="用途、机房或账单信息"></label>
+  <button type="submit">添加节点</button>
+</form>
+</section>
+
+<section class="panel">
+<div class="section-title">
+  <h2>节点列表</h2>
+  <span class="muted">{{ nodes|length }} 个节点</span>
+</div>
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr>
+      <th>名称</th>
+      <th>主机 / Alias</th>
+      <th>SSH</th>
+      <th>Snell 端口</th>
+      <th>协议</th>
+      <th>状态</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for node in nodes %}
+    <tr>
+      <td><a href="/nodes/{{ node.id }}">{{ node.name }}</a></td>
+      <td>{{ node.ssh_alias or node.host }}</td>
+      <td>{{ node.ssh_user or "alias" }}{% if node.ssh_port %}:{{ node.ssh_port }}{% endif %}</td>
+      <td>{{ node.snell_port }}</td>
+      <td>{% if node.enable_tcp %}tcp {% endif %}{% if node.enable_udp %}udp{% endif %}</td>
+      <td><span class="badge {{ 'badge-ok' if node.enabled else 'badge-off' }}">{{ "启用" if node.enabled else "停用" }}</span></td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+</section>
+{% endblock %}

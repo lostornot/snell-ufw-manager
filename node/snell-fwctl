@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+ALLOWED_COMMANDS = {
+    "snell": {
+        "install",
+        "status",
+        "start",
+        "stop",
+        "restart",
+        "config-get",
+        "config-apply",
+        "logs",
+        "backup",
+        "restore",
+    },
+    "ufw": {
+        "list",
+        "apply",
+        "backup",
+        "restore",
+        "candidates",
+        "enable",
+    },
+}
+
+
+def emit(ok: bool, data: dict[str, Any] | None, error: dict[str, str] | None) -> None:
+    print(json.dumps({"ok": ok, "data": data or {}, "error": error}, separators=(",", ":")))
+
+
+def fail(code: str, message: str, returncode: int = 2) -> int:
+    emit(False, {}, {"code": code, "message": message})
+    return returncode
+
+
+def read_payload() -> tuple[dict[str, Any] | list[Any] | None, str | None]:
+    raw = sys.stdin.read()
+    if not raw.strip():
+        return {}, None
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        return None, str(exc)
+    if not isinstance(payload, (dict, list)):
+        return None, "payload must be a JSON object or array"
+    return payload, None
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 3:
+        return fail("INVALID_ARGUMENTS", "usage: snell-fwctl <snell|ufw> <subcommand>")
+
+    _, namespace, subcommand = argv
+    allowed = ALLOWED_COMMANDS.get(namespace)
+    if allowed is None:
+        return fail("UNKNOWN_NAMESPACE", f"unknown namespace: {namespace}")
+    if subcommand not in allowed:
+        return fail("UNKNOWN_SUBCOMMAND", f"unknown subcommand: {subcommand}")
+
+    payload, payload_error = read_payload()
+    if payload_error:
+        return fail("INVALID_JSON", payload_error)
+
+    tool = Path(__file__).resolve().parent / ("snellctl" if namespace == "snell" else "ufwctl")
+    env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}
+    completed = subprocess.run(
+        [sys.executable, str(tool), subcommand],
+        input=json.dumps(payload or {}, separators=(",", ":")),
+        text=True,
+        capture_output=True,
+        env=env | {"PYTHONPATH": os.environ.get("PYTHONPATH", "")},
+    )
+    if completed.stdout:
+        print(completed.stdout, end="")
+    else:
+        emit(
+            False,
+            {},
+            {
+                "code": "INTERNAL_TOOL_EMPTY_OUTPUT",
+                "message": completed.stderr or "internal tool produced no output",
+            },
+        )
+        return completed.returncode or 1
+    return completed.returncode
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
+

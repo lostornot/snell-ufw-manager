@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>总览</h1>
+    <p>集中管理 Snell 节点、Snell 端口白名单和中转来源。控制台当前只监听 {{ bind_address }}。</p>
+  </div>
+</div>
+<dl class="stats">
+  <div><dt>节点</dt><dd>{{ node_count }}</dd></div>
+  <div><dt>中转组</dt><dd>{{ relay_group_count }}</dd></div>
+  <div><dt>操作日志</dt><dd>{{ audit_count }}</dd></div>
+  <div><dt>访问方式</dt><dd>本地</dd></div>
+</dl>
+<section class="panel">
+  <div class="section-title">
+    <h2>工作入口</h2>
+    <span class="badge badge-ok">127.0.0.1</span>
+  </div>
+  <p class="muted">从“节点”添加 VPS，从“中转组”维护出口 IP/CIDR，再到“访问策略”把中转组应用到指定 Snell 节点。</p>
+  <form method="post" action="/nodes/stub" class="visually-hidden" aria-hidden="true">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit">CSRF 检查</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>中转组</h1>
+    <p>维护可信中转出口 IP 或 CIDR。候选来源加入前必须人工确认。</p>
+  </div>
+</div>
+<section class="panel">
+<div class="section-title">
+  <h2>添加中转组</h2>
+</div>
+<form method="post" action="/relay-groups" class="inline-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>名称 <input name="name" required placeholder="香港中转"></label>
+  <label>备注 <input name="remark"></label>
+  <button type="submit">添加中转组</button>
+</form>
+</section>
+
+{% for group in relay_groups %}
+<section class="panel">
+  <div class="section-title">
+    <h2>{{ group.name }}</h2>
+    <span class="badge">{{ group.relay_ips|length }} 条来源</span>
+  </div>
+  {% if group.remark %}<p>{{ group.remark }}</p>{% endif %}
+  <form method="post" action="/relay-groups/{{ group.id }}/edit" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>名称 <input name="name" value="{{ group.name }}" required></label>
+    <label>备注 <input name="remark" value="{{ group.remark or '' }}"></label>
+    <button type="submit">保存中转组</button>
+  </form>
+  <form method="post" action="/relay-groups/{{ group.id }}/delete" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <button type="submit" class="button-danger">删除中转组</button>
+  </form>
+  <form method="post" action="/relay-groups/{{ group.id }}/ips" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>IP/CIDR <input name="value" required></label>
+    <label>备注 <input name="remark"></label>
+    <button type="submit">添加来源</button>
+  </form>
+  <ul class="relay-ip-list">
+    {% for relay_ip in group.relay_ips %}
+    <li>
+      <span><code>{{ relay_ip.value }}</code>{% if relay_ip.remark %} <span class="muted">{{ relay_ip.remark }}</span>{% endif %}</span>
+      <form method="post" action="/relay-groups/{{ group.id }}/ips/{{ relay_ip.id }}/delete" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit" class="button-danger">删除</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endfor %}
+{% endblock %}
