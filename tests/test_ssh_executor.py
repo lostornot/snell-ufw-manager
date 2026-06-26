@@ -65,6 +65,21 @@ def test_builds_alias_based_ssh_command_array() -> None:
     ]
 
 
+def test_builds_system_check_command_array() -> None:
+    command = build_ssh_command(field_node(), "system", "check")
+
+    assert command == [
+        "ssh",
+        "-p",
+        "2222",
+        "snellmgr@203.0.113.10",
+        "sudo",
+        "/usr/local/sbin/snell-fwctl",
+        "system",
+        "check",
+    ]
+
+
 def test_field_based_command_can_include_identity_file() -> None:
     node = field_node()
     node.ssh_key_path = "/Users/me/.ssh/snell_control_ed25519"
@@ -147,4 +162,3 @@ def test_run_remote_command_captures_timeouts(monkeypatch) -> None:
 
     assert result.timed_out is True
     assert result.returncode is None
-

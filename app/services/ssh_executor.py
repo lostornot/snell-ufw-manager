@@ -30,6 +30,9 @@ ALLOWED_COMMANDS: dict[str, set[str]] = {
         "candidates",
         "enable",
     },
+    "system": {
+        "check",
+    },
 }
 
 

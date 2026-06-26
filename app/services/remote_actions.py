@@ -113,6 +113,14 @@ def refresh_ufw_list(db: Session, node_id: int) -> dict[str, Any]:
     return result
 
 
+def check_node_environment(db: Session, node_id: int) -> dict[str, Any]:
+    node = _get_node(db, node_id)
+    payload = {"node_id": node.id}
+    result = _result_body(run_remote_command(_node_payload(node), "system", "check", payload))
+    _audit_remote(db, action="node.check", node=node, request_json=payload, result=result)
+    return result
+
+
 def apply_ufw_policy(db: Session, node_id: int) -> dict[str, Any]:
     node = (
         db.query(Node)

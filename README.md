@@ -58,6 +58,13 @@ snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/snell-fwctl
 
 The security boundary is the restricted command allowlist, root-owned tool files, JSON stdin validation, and no arbitrary shell support.
 
+In the controller UI, adding a node only records its desired state and SSH connection information. For a new VPS, open the node detail page and use the `节点初始化` section:
+
+1. Run `scripts/install-node.sh` on the VPS to install the restricted node tools.
+2. Return to the controller and click `检查节点环境`.
+3. Install Snell Server from the node detail page.
+4. Apply Snell config and UFW allowlist rules.
+
 ## SSH Alias
 
 Prefer OpenSSH config aliases and do not store private key material in SQLite:

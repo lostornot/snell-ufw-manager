@@ -39,6 +39,7 @@ from app.services.relay_groups import (
     update_relay_group,
 )
 from app.services.remote_actions import (
+    check_node_environment,
     get_snell_config,
     install_snell,
     read_snell_logs,
@@ -212,12 +213,24 @@ def create_app() -> FastAPI:
             .order_by(AuditLog.id.desc())
             .first()
         )
+        latest_node_check = (
+            db.query(AuditLog)
+            .filter(
+                AuditLog.target_type == "node",
+                AuditLog.target_id == node.id,
+                AuditLog.action == "node.check",
+                AuditLog.success.is_(True),
+            )
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
         context = authenticated_context(request, node.name)
         context |= {
             "node": node,
             "policy_preview": build_ufw_apply_payload(node),
             "relay_groups": list_relay_groups(db),
             "latest_ufw_list": latest_ufw_list.result_json if latest_ufw_list else None,
+            "latest_node_check": latest_node_check.result_json if latest_node_check else None,
             "candidates": db.query(AccessCandidate)
             .filter(AccessCandidate.node_id == node.id)
             .order_by(AccessCandidate.last_seen_at.desc())
@@ -341,6 +354,10 @@ def create_app() -> FastAPI:
     @app.post("/nodes/{node_id}/refresh-status", dependencies=[Depends(verify_csrf)])
     def node_refresh_status(node_id: int, db: Session = Depends(get_session_db)) -> RedirectResponse:
         return run_node_action(refresh_node_status, db, node_id)
+
+    @app.post("/nodes/{node_id}/check-environment", dependencies=[Depends(verify_csrf)])
+    def node_check_environment(node_id: int, db: Session = Depends(get_session_db)) -> RedirectResponse:
+        return run_node_action(check_node_environment, db, node_id)
 
     @app.post("/nodes/{node_id}/install-snell", dependencies=[Depends(verify_csrf)])
     def node_install_snell(

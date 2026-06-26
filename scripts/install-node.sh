@@ -6,6 +6,7 @@ LIB_DIR="/usr/local/lib/snell-ufw-control"
 ENTRYPOINT="/usr/local/sbin/snell-fwctl"
 SNELLCTL="/usr/local/lib/snell-ufw-control/snellctl"
 UFWCTL="/usr/local/lib/snell-ufw-control/ufwctl"
+SYSTEMCTL="/usr/local/lib/snell-ufw-control/systemctl"
 SUDOERS_FILE="/etc/sudoers.d/snell-ufw-control"
 
 command -v python3 >/dev/null
@@ -18,8 +19,9 @@ install -d -m 0755 "$LIB_DIR"
 install -m 0755 node/snell-fwctl "$ENTRYPOINT"
 install -m 0755 node/snellctl "$SNELLCTL"
 install -m 0755 node/ufwctl "$UFWCTL"
-chown root:root "$ENTRYPOINT" "$SNELLCTL" "$UFWCTL"
-chmod 0755 "$ENTRYPOINT" "$SNELLCTL" "$UFWCTL"
+install -m 0755 node/systemctl "$SYSTEMCTL"
+chown root:root "$ENTRYPOINT" "$SNELLCTL" "$UFWCTL" "$SYSTEMCTL"
+chmod 0755 "$ENTRYPOINT" "$SNELLCTL" "$UFWCTL" "$SYSTEMCTL"
 
 cat > "$SUDOERS_FILE" <<EOF
 $USER_NAME ALL=(root) NOPASSWD: /usr/local/sbin/snell-fwctl

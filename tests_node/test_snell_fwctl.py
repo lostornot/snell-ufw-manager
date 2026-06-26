@@ -80,3 +80,15 @@ def test_dispatches_ufw_list() -> None:
     assert body["data"]["subcommand"] == "list"
     assert body["data"]["active"] is False
     assert body["data"]["warnings"]
+
+
+def test_dispatches_system_check() -> None:
+    process = run_fwctl("system", "check")
+
+    assert process.returncode == 0
+    body = parse_json(process)
+    assert body["ok"] is True
+    assert body["error"] is None
+    assert body["data"]["namespace"] == "system"
+    assert body["data"]["subcommand"] == "check"
+    assert body["data"]["snell_fwctl"]["present"] is True

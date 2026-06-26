@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import getpass
+import json
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+from typing import Any
+
+
+def emit(ok: bool, data: dict[str, Any] | None, error: dict[str, str] | None) -> None:
+    print(json.dumps({"ok": ok, "data": data or {}, "error": error}, separators=(",", ":")))
+
+
+def fail(code: str, message: str, returncode: int = 2) -> int:
+    emit(False, {}, {"code": code, "message": message})
+    return returncode
+
+
+def tool_status(path: Path) -> dict[str, Any]:
+    return {
+        "path": str(path),
+        "present": path.exists(),
+        "executable": os.access(path, os.X_OK),
+        "owner_uid": path.stat().st_uid if path.exists() else None,
+    }
+
+
+def binary_status(name: str) -> dict[str, Any]:
+    found = shutil.which(name)
+    return {"name": name, "path": found, "present": found is not None}
+
+
+def ufw_status() -> dict[str, Any]:
+    ufw = shutil.which("ufw")
+    if ufw is None:
+        return {"active": False, "available": False, "raw": ""}
+    completed = subprocess.run(
+        [ufw, "status"],
+        text=True,
+        capture_output=True,
+        timeout=10,
+    )
+    raw = completed.stdout.strip()
+    return {
+        "active": raw.lower().startswith("status: active"),
+        "available": True,
+        "raw": raw,
+        "returncode": completed.returncode,
+    }
+
+
+def check() -> int:
+    root = Path(__file__).resolve().parent
+    data = {
+        "namespace": "system",
+        "subcommand": "check",
+        "running_user": getpass.getuser(),
+        "effective_uid": os.geteuid(),
+        "snell_fwctl": tool_status(root / "snell-fwctl"),
+        "snellctl": tool_status(root / "snellctl"),
+        "ufwctl": tool_status(root / "ufwctl"),
+        "snell_binary": binary_status("snell-server"),
+        "ufw_binary": binary_status("ufw"),
+        "ufw": ufw_status(),
+    }
+    emit(True, data, None)
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 2:
+        return fail("INVALID_ARGUMENTS", "usage: systemctl <check>")
+    _, subcommand = argv
+    if subcommand != "check":
+        return fail("UNKNOWN_SUBCOMMAND", f"unknown subcommand: {subcommand}")
+    return check()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

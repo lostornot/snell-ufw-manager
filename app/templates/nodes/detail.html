@@ -20,6 +20,44 @@
 
 <section class="panel">
   <div class="section-title">
+    <h2>节点初始化</h2>
+    <span class="badge">先装受限工具，再管理 Snell</span>
+  </div>
+  <p class="muted">添加节点只会登记连接信息。新 VPS 需要先安装节点侧受限工具，之后面板才能通过 SSH 调用 <code>snell-fwctl</code>。</p>
+  <ul class="code-list">
+    <li>ssh root@{{ node.host or "&lt;node-ip&gt;" }}</li>
+    <li>git clone https://github.com/lostornot/snell-ufw-manager.git</li>
+    <li>cd snell-ufw-manager &amp;&amp; sudo scripts/install-node.sh</li>
+  </ul>
+  <p class="muted">安装后确认 SSH 配置使用 <code>snellmgr</code> 用户，或在 OpenSSH config 里配置 alias，再回到这里执行检查。</p>
+  <div class="button-row">
+    <form method="post" action="/nodes/{{ node.id }}/check-environment">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button type="submit">检查节点环境</button>
+    </form>
+  </div>
+  {% if latest_node_check %}
+    {% set check_data = latest_node_check.data %}
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>检查项</th><th>状态</th></tr></thead>
+        <tbody>
+          <tr><td>snell-fwctl</td><td><span class="badge {{ 'badge-ok' if check_data.snell_fwctl.present else 'badge-warn' }}">{{ "已安装" if check_data.snell_fwctl.present else "未安装" }}</span></td></tr>
+          <tr><td>snellctl</td><td><span class="badge {{ 'badge-ok' if check_data.snellctl.present else 'badge-warn' }}">{{ "已安装" if check_data.snellctl.present else "未安装" }}</span></td></tr>
+          <tr><td>ufwctl</td><td><span class="badge {{ 'badge-ok' if check_data.ufwctl.present else 'badge-warn' }}">{{ "已安装" if check_data.ufwctl.present else "未安装" }}</span></td></tr>
+          <tr><td>Snell Server</td><td><span class="badge {{ 'badge-ok' if check_data.snell_binary.present else 'badge-warn' }}">{{ "已安装" if check_data.snell_binary.present else "未安装" }}</span></td></tr>
+          <tr><td>UFW</td><td><span class="badge {{ 'badge-ok' if check_data.ufw_binary.present else 'badge-warn' }}">{{ "已安装" if check_data.ufw_binary.present else "未安装" }}</span></td></tr>
+          <tr><td>UFW 状态</td><td><span class="badge {{ 'badge-ok' if check_data.ufw.active else 'badge-off' }}">{{ "active" if check_data.ufw.active else "inactive" }}</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted">还没有检查过这个节点。</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-title">
     <h2>节点设置</h2>
     <span class="badge {{ 'badge-ok' if node.enabled else 'badge-off' }}">{{ "启用" if node.enabled else "停用" }}</span>
   </div>

@@ -29,6 +29,9 @@ ALLOWED_COMMANDS = {
         "candidates",
         "enable",
     },
+    "system": {
+        "check",
+    },
 }
 
 
@@ -54,9 +57,17 @@ def read_payload() -> tuple[dict[str, Any] | list[Any] | None, str | None]:
     return payload, None
 
 
+def resolve_tool(namespace: str) -> Path:
+    tool_name = {"snell": "snellctl", "ufw": "ufwctl", "system": "systemctl"}[namespace]
+    installed_tool = Path("/usr/local/lib/snell-ufw-control") / tool_name
+    if installed_tool.exists():
+        return installed_tool
+    return Path(__file__).resolve().parent / tool_name
+
+
 def main(argv: list[str]) -> int:
     if len(argv) != 3:
-        return fail("INVALID_ARGUMENTS", "usage: snell-fwctl <snell|ufw> <subcommand>")
+        return fail("INVALID_ARGUMENTS", "usage: snell-fwctl <snell|ufw|system> <subcommand>")
 
     _, namespace, subcommand = argv
     allowed = ALLOWED_COMMANDS.get(namespace)
@@ -69,7 +80,7 @@ def main(argv: list[str]) -> int:
     if payload_error:
         return fail("INVALID_JSON", payload_error)
 
-    tool = Path(__file__).resolve().parent / ("snellctl" if namespace == "snell" else "ufwctl")
+    tool = resolve_tool(namespace)
     env = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}
     completed = subprocess.run(
         [sys.executable, str(tool), subcommand],
@@ -95,4 +106,3 @@ def main(argv: list[str]) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv))
-

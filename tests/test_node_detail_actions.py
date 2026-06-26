@@ -63,6 +63,7 @@ def test_node_detail_page_renders_action_forms(monkeypatch, tmp_path: Path) -> N
     assert 'action="/nodes/1/apply-ufw"' in response.text
     assert 'action="/nodes/1/apply-config"' in response.text
     assert 'action="/nodes/1/candidates"' in response.text
+    assert 'action="/nodes/1/check-environment"' in response.text
     assert 'action="/nodes/1/edit"' in response.text
     assert 'action="/nodes/1/config"' in response.text
     assert 'action="/nodes/1/delete"' in response.text
@@ -83,6 +84,7 @@ def test_node_detail_actions_call_remote_services(monkeypatch, tmp_path: Path) -
     monkeypatch.setattr(main_module, "apply_ufw_policy", fake_action)
     monkeypatch.setattr(main_module, "apply_snell_config", fake_action)
     monkeypatch.setattr(main_module, "refresh_access_candidates", fake_action)
+    monkeypatch.setattr(main_module, "check_node_environment", fake_action)
 
     client = authenticated_client(monkeypatch, tmp_path)
     token = csrf_token(client.get("/nodes/1").text)
@@ -94,12 +96,13 @@ def test_node_detail_actions_call_remote_services(monkeypatch, tmp_path: Path) -
         "/nodes/1/apply-ufw",
         "/nodes/1/apply-config",
         "/nodes/1/candidates",
+        "/nodes/1/check-environment",
     ]:
         response = client.post(path, data={"csrf_token": token}, follow_redirects=False)
         assert response.status_code == 303
         assert response.headers["location"] == "/nodes/1"
 
-    assert calls == ["1", "1", "1", "1", "1", "1"]
+    assert calls == ["1", "1", "1", "1", "1", "1", "1"]
 
 
 def test_node_detail_snell_service_actions_call_remote_services(monkeypatch, tmp_path: Path) -> None:
@@ -226,3 +229,38 @@ def test_node_detail_shows_latest_remote_ufw_whitelist(monkeypatch, tmp_path: Pa
     assert "UFW 未启用" in detail.text
     assert "198.51.100.8" in detail.text
     assert "snell-control:node:1:group:1:port:23456:proto:udp" in detail.text
+
+
+def test_node_detail_shows_bootstrap_steps_and_latest_check(monkeypatch, tmp_path: Path) -> None:
+    client = authenticated_client(monkeypatch, tmp_path)
+    with SessionLocal() as db:
+        audit = AuditLog(
+            actor="admin",
+            action="node.check",
+            target_type="node",
+            target_id=1,
+            summary="node.check for Tokyo 1",
+            success=True,
+            result_json={
+                "ok": True,
+                "data": {
+                    "snell_fwctl": {"present": True},
+                    "snellctl": {"present": True},
+                    "ufwctl": {"present": True},
+                    "snell_binary": {"present": False},
+                    "ufw_binary": {"present": True},
+                    "ufw": {"active": False},
+                },
+            },
+        )
+        db.add(audit)
+        db.commit()
+
+    detail = client.get("/nodes/1")
+
+    assert "节点初始化" in detail.text
+    assert "scripts/install-node.sh" in detail.text
+    assert "snellmgr" in detail.text
+    assert 'action="/nodes/1/check-environment"' in detail.text
+    assert "snell-fwctl" in detail.text
+    assert "未安装" in detail.text

@@ -23,6 +23,7 @@ def test_node_installer_uses_single_restricted_nopasswd_entrypoint() -> None:
     assert "NOPASSWD: /usr/local/sbin/snell-fwctl" in script
     assert "/usr/local/lib/snell-ufw-control/snellctl" in script
     assert "/usr/local/lib/snell-ufw-control/ufwctl" in script
+    assert "/usr/local/lib/snell-ufw-control/systemctl" in script
     assert "visudo -cf" in script
     assert "chown root:root" in script
     assert "chmod 0755" in script
@@ -46,4 +47,3 @@ def test_readme_documents_security_model() -> None:
     assert "UFW inactive" in readme
     assert "Snell version" in readme
     assert "not a general VPS panel" in readme
-

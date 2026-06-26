@@ -7,6 +7,7 @@ from app.db import Base
 from app.models import AuditLog, Node, RelayGroup, RelayIP, NodePolicy
 from app.services import remote_actions
 from app.services.remote_actions import (
+    check_node_environment,
     get_snell_config,
     install_snell,
     read_snell_logs,
@@ -95,6 +96,31 @@ def test_refresh_ufw_list_returns_remote_data_and_audits(monkeypatch) -> None:
 
     assert result["data"]["active"] is False
     assert db.query(AuditLog).one().action == "ufw.list"
+
+
+def test_check_node_environment_returns_remote_data_and_audits(monkeypatch) -> None:
+    db = session()
+    node = create_node(db)
+
+    def fake_run(node_payload, namespace, subcommand, payload):
+        assert namespace == "system"
+        assert subcommand == "check"
+        assert payload == {"node_id": node.id}
+        return ok_result(
+            {
+                "snell_fwctl": {"present": True},
+                "snellctl": {"present": True},
+                "ufwctl": {"present": True},
+                "ufw": {"active": False},
+            }
+        )
+
+    monkeypatch.setattr(remote_actions, "run_remote_command", fake_run)
+
+    result = check_node_environment(db, node.id)
+
+    assert result["data"]["snell_fwctl"]["present"] is True
+    assert db.query(AuditLog).one().action == "node.check"
 
 
 def test_apply_ufw_policy_uses_policy_payload(monkeypatch) -> None:
