@@ -261,12 +261,14 @@ async def node_detail(request: Request, node_id: int):
             node["country_code"] = country_code
             
     ip_groups = await db.get_all_ip_groups()
+    all_nodes = await db.get_all_nodes()
     return templates.TemplateResponse(
         "node_detail.html",
         {
             "request": request,
             "node": node,
             "ip_groups": ip_groups,
+            "all_nodes": all_nodes,
             "access_log_hours": config.log.access_log_hours,
         },
     )
@@ -414,10 +416,11 @@ async def api_open_port(
     tag: str = Form("Custom Rule"),
     initial_ip: str = Form(""),
     initial_ip_group_id: str = Form(""),
+    target_node_ids: list[str] = Form(default=[]),
 ):
-    """Open a UFW service port and return updated Port Cards Grid."""
-    node = await db.get_node(node_id)
-    if not node:
+    """Open a UFW service port on multiple nodes and return updated Port Cards Grid for current node."""
+    current_node = await db.get_node(node_id)
+    if not current_node:
         raise HTTPException(status_code=404)
 
     if port < 1 or port > 65535:
@@ -429,10 +432,6 @@ async def api_open_port(
             parsed_group_id = int(initial_ip_group_id)
         except ValueError:
             pass
-
-    success = True
-    added_targets = []
-    error_msg = ""
 
     # Determine whitelist targets
     targets = []
@@ -447,35 +446,221 @@ async def api_open_port(
         # Default: open to Anywhere
         targets.append(("anywhere", "Public Access"))
 
-    # Execute on remote node via SSH
+    # Validate all targets first
     for ip, desc in targets:
         if not validate_ip_cidr(ip):
-            success = False
-            error_msg = f"无效的 IP/CIDR 地址: {ip}"
-            break
-        
-        result = await ssh.run(node, f"add {ip} {port} {protocol}")
-        if not result.get("ok"):
-            success = False
-            error_msg = result.get("error", "添加规则失败")
-            break
-        added_targets.append(ip)
+            toast = {"type": "error", "message": f"❌ 无效的 IP/CIDR 地址: {ip}"}
+            return await render_ports_grid_with_toast(request, current_node, toast)
 
-    # Log operation
-    log_detail = f"开通端口 {port}/{protocol} ({tag}). 授权: {', '.join(added_targets) if added_targets else 'Anywhere'}"
-    if not success:
-        log_detail += f" (失败: {error_msg})"
-    await db.add_op_log(node_id, node["name"], "OPEN_PORT", f"{port}", log_detail, success)
+    # Combined nodes list (current + target check boxes)
+    nodes_to_process = [node_id]
+    for tid in target_node_ids:
+        try:
+            val = int(tid)
+            if val != node_id:
+                nodes_to_process.append(val)
+        except ValueError:
+            pass
 
-    # Fetch updated grid
-    toast = None
-    if not success:
-        toast = {"type": "error", "message": f"❌ 开通端口失败: {error_msg}"}
+    success_nodes = []
+    failed_nodes = []
+
+    for nid in nodes_to_process:
+        target_node = await db.get_node(nid)
+        if not target_node:
+            continue
+
+        # Fetch current node's rules to avoid duplicate config (idempotency check)
+        wl_result = await ssh.get_whitelist(target_node)
+        existing_rules = wl_result.get("rules", []) if wl_result.get("ok") else []
+
+        targets_to_add = []
+        for ip, desc in targets:
+            # Check if this IP/CIDR is already whitelisted on this port with desired protocol
+            has_tcp = False
+            has_udp = False
+            for r in existing_rules:
+                if str(r.get("port")) == str(port) and r.get("ip") == ip:
+                    if r.get("proto") == "tcp":
+                        has_tcp = True
+                    elif r.get("proto") == "udp":
+                        has_udp = True
+                    elif r.get("proto") == "all":
+                        has_tcp = True
+                        has_udp = True
+
+            already_allowed = False
+            if protocol == "tcp" and has_tcp:
+                already_allowed = True
+            elif protocol == "udp" and has_udp:
+                already_allowed = True
+            elif protocol == "both" and has_tcp and has_udp:
+                already_allowed = True
+
+            if not already_allowed:
+                targets_to_add.append(ip)
+
+        if not targets_to_add:
+            # Rules already exist, skip execution
+            await db.add_op_log(
+                nid,
+                target_node["name"],
+                "OPEN_PORT",
+                f"{port}",
+                f"跳过端口 {port}/{protocol} 配置：对应的 IP 白名单规则在此节点已存在，无需重复配置。",
+                True
+            )
+            success_nodes.append(target_node["name"])
+            continue
+
+        # Execute SSH add commands
+        node_success = True
+        node_error_msg = ""
+        added_ips = []
+
+        for ip in targets_to_add:
+            result = await ssh.run(target_node, f"add {ip} {port} {protocol}")
+            if not result.get("ok"):
+                node_success = False
+                node_error_msg = result.get("error", "添加规则失败")
+                break
+            added_ips.append(ip)
+
+        if node_success:
+            log_detail = f"批量部署开通端口 {port}/{protocol} ({tag})。授权: {', '.join(added_ips)}"
+            await db.add_op_log(nid, target_node["name"], "OPEN_PORT", f"{port}", log_detail, True)
+            success_nodes.append(target_node["name"])
+        else:
+            log_detail = f"批量部署端口 {port}/{protocol} ({tag}) 失败。尝试授权: {', '.join(targets_to_add)}，原因: {node_error_msg}"
+            await db.add_op_log(nid, target_node["name"], "OPEN_PORT", f"{port}", log_detail, False)
+            failed_nodes.append(f"{target_node['name']} ({node_error_msg})")
+
+    # Generate comprehensive toast message
+    if failed_nodes:
+        if success_nodes:
+            toast = {
+                "type": "error",
+                "message": f"⚠️ 批量部署部分完成。成功: {', '.join(success_nodes)}；失败: {', '.join(failed_nodes)}"
+            }
+        else:
+            toast = {
+                "type": "error",
+                "message": f"❌ 批量部署失败。原因: {', '.join(failed_nodes)}"
+            }
     else:
-        toast = {"type": "success", "message": f"✅ 已成功开放端口 {port} 并部署放行规则！"}
+        toast = {
+            "type": "success",
+            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上开放端口 {port} 并部署白名单！"
+        }
 
-    # Re-render ports grid with toast trigger
-    return await render_ports_grid_with_toast(request, node, toast)
+    # Re-render current node's ports grid with toast
+    return await render_ports_grid_with_toast(request, current_node, toast)
+
+
+@app.post("/api/nodes/{node_id}/ports/bulk-delete", response_class=HTMLResponse)
+async def api_bulk_delete_port_rule(
+    request: Request,
+    node_id: int,
+    port: int = Form(...),
+    protocol: str = Form("both"),
+    initial_ip: str = Form(""),
+    initial_ip_group_id: str = Form(""),
+    target_node_ids: list[str] = Form(default=[]),
+):
+    """Bulk delete whitelisted IP/Group on a port across multiple nodes."""
+    current_node = await db.get_node(node_id)
+    if not current_node:
+        raise HTTPException(status_code=404)
+        
+    parsed_group_id = None
+    if initial_ip_group_id.strip():
+        try:
+            parsed_group_id = int(initial_ip_group_id)
+        except ValueError:
+            pass
+
+    # Determine targets to delete
+    targets = []
+    desc_label = ""
+    if initial_ip and initial_ip.strip():
+        targets.append(initial_ip.strip())
+        desc_label = f"IP: {initial_ip.strip()}"
+    elif parsed_group_id:
+        group = await db.get_ip_group(parsed_group_id)
+        if group:
+            for item in group.get("ips", []):
+                targets.append(item["ip_cidr"])
+            desc_label = f"IP 分组: {group['name']}"
+
+    if not targets:
+        toast = {"type": "error", "message": "❌ 请输入或选择需要批量删除的白名单 IP/IP 分组！"}
+        return await render_ports_grid_with_toast(request, current_node, toast)
+
+    # Validate all targets first
+    for ip in targets:
+        if not validate_ip_cidr(ip):
+            toast = {"type": "error", "message": f"❌ 无效的 IP/CIDR 地址: {ip}"}
+            return await render_ports_grid_with_toast(request, current_node, toast)
+
+    # Combined nodes list (current + target check boxes)
+    nodes_to_process = [node_id]
+    for tid in target_node_ids:
+        try:
+            val = int(tid)
+            if val != node_id:
+                nodes_to_process.append(val)
+        except ValueError:
+            pass
+
+    success_nodes = []
+    failed_nodes = []
+
+    for nid in nodes_to_process:
+        target_node = await db.get_node(nid)
+        if not target_node:
+            continue
+
+        node_success = True
+        node_error_msg = ""
+        deleted_ips = []
+
+        for ip in targets:
+            result = await ssh.run(target_node, f"delete {ip} {port}")
+            if not result.get("ok"):
+                node_success = False
+                node_error_msg = result.get("error", "删除规则失败")
+                break
+            deleted_ips.append(ip)
+
+        if node_success:
+            log_detail = f"批量关闭删除白名单。端口: {port}，目标: {desc_label} ({', '.join(deleted_ips)})"
+            await db.add_op_log(nid, target_node["name"], "DELETE_RULE", f"{port}", log_detail, True)
+            success_nodes.append(target_node["name"])
+        else:
+            log_detail = f"批量删除白名单失败。端口: {port}，目标: {desc_label}，原因: {node_error_msg}"
+            await db.add_op_log(nid, target_node["name"], "DELETE_RULE", f"{port}", log_detail, False)
+            failed_nodes.append(f"{target_node['name']} ({node_error_msg})")
+
+    # Generate comprehensive toast message
+    if failed_nodes:
+        if success_nodes:
+            toast = {
+                "type": "error",
+                "message": f"⚠️ 批量删除部分完成。成功: {', '.join(success_nodes)}；失败: {', '.join(failed_nodes)}"
+            }
+        else:
+            toast = {
+                "type": "error",
+                "message": f"❌ 批量删除规则失败。原因: {', '.join(failed_nodes)}"
+            }
+    else:
+        toast = {
+            "type": "success",
+            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上，针对端口 {port} 删除了对应的白名单！"
+        }
+
+    # Re-render current node's ports grid with toast
+    return await render_ports_grid_with_toast(request, current_node, toast)
 
 
 @app.delete("/api/nodes/{node_id}/ports/{port}", response_class=HTMLResponse)

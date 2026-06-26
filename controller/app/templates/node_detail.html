@@ -66,11 +66,11 @@
   <!-- Right Column: Sidebar Sticky Form -->
   <div class="sidebar-section">
     <div class="glass-card sticky" style="padding: 24px;">
-      <h3>⚡ 开启服务端口</h3>
-      <form hx-post="/api/nodes/{{ node.id }}/ports"
+      <h3>⚡ 端口防火墙部署</h3>
+      <form id="bulk-port-form"
             hx-target="#port-cards-grid"
             hx-swap="innerHTML"
-            hx-indicator="#open-port-spinner">
+            hx-indicator="#port-action-spinner">
         
         <div class="form-group">
           <label class="form-label">端口号 *</label>
@@ -97,7 +97,7 @@
 
         <div class="divider"></div>
         
-        <div class="sub-header">💡 可选：初始授权白名单</div>
+        <div class="sub-header">💡 IP 授权白名单 (开通/删除时生效)</div>
         
         <div class="form-group">
           <label class="form-label">单一 IP 或网段 (CIDR)</label>
@@ -113,9 +113,45 @@
             {% endfor %}
           </select>
         </div>
+
+        <div class="divider"></div>
         
-        <div style="margin-top: 24px;">
-          <button type="submit" class="btn btn-primary w-full" style="justify-content: center;"><span class="spinner htmx-indicator" id="open-port-spinner" style="margin-right: 6px;"></span>确认部署放行规则</button>
+        <div class="sub-header">🖥️ 批量部署选项 (可选)</div>
+        
+        <div class="form-group">
+          <label class="form-label">同时应用到以下被控节点：</label>
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 140px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); background: var(--bg-primary);">
+            {% for n in all_nodes %}
+              {% if n.id != node.id %}
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
+                <input type="checkbox" name="target_node_ids" value="{{ n.id }}" style="cursor: pointer; width: 14px; height: 14px;">
+                <span>{{ get_flag_emoji(n.country_code) }} {{ n.name }} <span class="text-secondary" style="font-size: 0.78rem;">({{ n.host }})</span></span>
+              </label>
+              {% endif %}
+            {% endfor %}
+            {% if (all_nodes | length) <= 1 %}
+              <span class="text-muted" style="font-size: 0.8rem; text-align: center; padding: 8px 0;">没有其他节点可选</span>
+            {% endif %}
+          </div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+          <button type="submit" 
+                  class="btn btn-primary w-full" 
+                  hx-post="/api/nodes/{{ node.id }}/ports"
+                  style="justify-content: center; font-weight: bold;">
+            <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
+            🚀 确认批量放行部署
+          </button>
+          
+          <button type="submit" 
+                  class="btn btn-danger w-full" 
+                  hx-post="/api/nodes/{{ node.id }}/ports/bulk-delete"
+                  hx-confirm="确定要在选中的所有 VPS 上，针对该端口删除对应的 IP/IP 分组白名单规则吗？"
+                  style="justify-content: center; font-weight: bold;">
+            <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
+            🗑️ 确认批量删除白名单
+          </button>
         </div>
       </form>
     </div>
