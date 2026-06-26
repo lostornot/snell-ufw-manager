@@ -72,74 +72,91 @@
             hx-swap="innerHTML"
             hx-indicator="#port-action-spinner">
         
-        <div class="form-group">
-          <label class="form-label">端口号 *</label>
-          <input type="number" name="port" class="form-input mono" placeholder="如 8388" required min="1" max="65535">
-        </div>
-        
-        <div class="form-group">
-          <label class="form-label">协议 *</label>
-          <select name="protocol" class="form-select">
-            <option value="both">TCP + UDP (推荐)</option>
-            <option value="tcp">TCP ONLY</option>
-            <option value="udp">UDP ONLY</option>
-          </select>
-        </div>
-        
-        <div class="form-group">
-          <label class="form-label">服务标签 *</label>
-          <select name="tag" class="form-select">
-            <option value="Snell Proxy">Snell Proxy (代理)</option>
-            <option value="SSH Access">SSH Access (运维)</option>
-            <option value="Custom Rule">Custom Rule (自定义)</option>
-          </select>
-        </div>
-
-        <div class="divider"></div>
-        
-        <div class="sub-header">💡 IP 授权白名单 (开通/删除时生效)</div>
-        
-        <div class="form-group">
-          <label class="form-label">单一 IP 或网段 (CIDR)</label>
-          <input type="text" name="initial_ip" class="form-input mono" placeholder="例如: 1.2.3.4">
-        </div>
-        
-        <div class="form-group">
-          <label class="form-label">或选择现有 IP 分组</label>
-          <select name="initial_ip_group_id" class="form-select">
-            <option value="">-- 不关联分组 --</option>
-            {% for group in ip_groups %}
-            <option value="{{ group.id }}">{{ group.name }} (包含 {{ group.ips | length }} IP)</option>
-            {% endfor %}
-          </select>
+        <!-- Section 1: Service and Port -->
+        <div class="form-section-card">
+          <div class="form-section-header" style="color: var(--accent-purple);">
+            <span>⚙️</span> 服务及端口配置
+          </div>
+          <div class="form-group">
+            <label class="form-label">端口号 *</label>
+            <input type="number" name="port" class="form-input mono" placeholder="如 8388" required min="1" max="65535">
+          </div>
+          <div class="form-group">
+            <label class="form-label">协议 *</label>
+            <select name="protocol" class="form-select">
+              <option value="both">TCP + UDP (推荐)</option>
+              <option value="tcp">TCP ONLY</option>
+              <option value="udp">UDP ONLY</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">服务标签 *</label>
+            <select name="tag" class="form-select">
+              <option value="Snell Proxy">Snell Proxy (代理)</option>
+              <option value="SSH Access">SSH Access (运维)</option>
+              <option value="Custom Rule">Custom Rule (自定义)</option>
+            </select>
+          </div>
         </div>
 
-        <div class="divider"></div>
-        
-        <div class="sub-header">🖥️ 批量部署选项 (可选)</div>
-        
-        <div class="form-group">
-          <label class="form-label">同时应用到以下被控节点：</label>
-          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; max-height: 140px; overflow-y: auto; padding: 10px; border: 1px solid var(--border-glass); border-radius: var(--radius-sm); background: var(--bg-primary);">
-            {% for n in all_nodes %}
-              {% if n.id != node.id %}
-              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.85rem; color: var(--text-primary);">
-                <input type="checkbox" name="target_node_ids" value="{{ n.id }}" style="cursor: pointer; width: 14px; height: 14px;">
-                <span>{{ get_flag_emoji(n.country_code) }} {{ n.name }} <span class="text-secondary" style="font-size: 0.78rem;">({{ n.host }})</span></span>
-              </label>
-              {% endif %}
-            {% endfor %}
-            {% if (all_nodes | length) <= 1 %}
-              <span class="text-muted" style="font-size: 0.8rem; text-align: center; padding: 8px 0;">没有其他节点可选</span>
-            {% endif %}
+        <!-- Section 2: IP Whitelist -->
+        <div class="form-section-card">
+          <div class="form-section-header" style="color: var(--accent-blue);">
+            <span>💡</span> IP 授权白名单
+          </div>
+          <div class="form-group">
+            <label class="form-label">单一 IP 或网段 (CIDR)</label>
+            <input type="text" name="initial_ip" class="form-input mono" placeholder="例如: 1.2.3.4">
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">或选择现有 IP 分组</label>
+            <select name="initial_ip_group_id" class="form-select">
+              <option value="">-- 不关联分组 --</option>
+              {% for group in ip_groups %}
+              <option value="{{ group.id }}">{{ group.name }} (包含 {{ group.ips | length }} IP)</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Section 3: Bulk Deployment -->
+        <div class="form-section-card" style="margin-bottom: 24px;">
+          <div class="form-section-header" style="color: var(--accent-teal);">
+            <span>🖥️</span> 批量部署选项 (可选)
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">同时应用到以下被控节点：</label>
+            
+            <div class="custom-multiselect" id="nodes-multiselect">
+              <div class="multiselect-trigger" onclick="toggleMultiselect(event)">
+                <span class="placeholder-text" style="color: var(--text-muted);">选择应用节点...</span>
+                <span class="dropdown-arrow">▼</span>
+              </div>
+              <div class="multiselect-dropdown">
+                {% for n in all_nodes %}
+                  {% if n.id != node.id %}
+                  <label class="multiselect-item" onclick="event.stopPropagation();">
+                    <input type="checkbox" name="target_node_ids" value="{{ n.id }}" onchange="updateSelectedCount()">
+                    <span>{{ get_flag_emoji(n.country_code) }}</span>
+                    <span style="font-weight: 500;">{{ n.name }}</span>
+                    <span class="text-secondary" style="font-size: 0.78rem;">({{ n.host }})</span>
+                  </label>
+                  {% endif %}
+                {% endfor %}
+                {% if (all_nodes | length) <= 1 %}
+                  <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 8px 0;">没有其他节点可选</div>
+                {% endif %}
+              </div>
+            </div>
+            
           </div>
         </div>
         
-        <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
           <button type="submit" 
                   class="btn btn-primary w-full" 
                   hx-post="/api/nodes/{{ node.id }}/ports"
-                  style="justify-content: center; font-weight: bold;">
+                  style="font-weight: bold;">
             <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
             确认批量放行部署
           </button>
@@ -148,7 +165,7 @@
                   class="btn btn-danger w-full" 
                   hx-post="/api/nodes/{{ node.id }}/ports/bulk-delete"
                   hx-confirm="确定要在选中的所有 VPS 上，针对该端口删除对应的 IP/IP 分组白名单规则吗？"
-                  style="justify-content: center; font-weight: bold;">
+                  style="font-weight: bold;">
             <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
             确认批量删除白名单
           </button>
@@ -158,4 +175,42 @@
   </div>
 
 </div>
+
+{% block scripts %}
+<script>
+function toggleMultiselect(event) {
+  event.stopPropagation();
+  const multiselect = event.currentTarget.closest('.custom-multiselect');
+  multiselect.classList.toggle('open');
+}
+
+function updateSelectedCount() {
+  const container = document.getElementById('nodes-multiselect');
+  if (!container) return;
+  const checkboxes = container.querySelectorAll('input[type="checkbox"]:checked');
+  const count = checkboxes.length;
+  const placeholder = container.querySelector('.placeholder-text');
+  
+  if (count > 0) {
+    placeholder.textContent = `已选择 ${count} 个节点`;
+    placeholder.style.color = 'var(--text-primary)';
+    placeholder.style.fontWeight = '600';
+  } else {
+    placeholder.textContent = '选择应用节点...';
+    placeholder.style.color = 'var(--text-muted)';
+    placeholder.style.fontWeight = 'normal';
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(event) {
+  const dropdowns = document.querySelectorAll('.custom-multiselect.open');
+  dropdowns.forEach(function(d) {
+    if (!d.contains(event.target)) {
+      d.classList.remove('open');
+    }
+  });
+});
+</script>
+{% endblock %}
 {% endblock %}
