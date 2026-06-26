@@ -948,6 +948,17 @@ tbody tr:hover {
    Loading Spinner
    ================================================================ */
 
+.spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(15, 23, 42, 0.1);
+  border-top-color: var(--accent-purple);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
 .htmx-indicator {
   display: none;
   opacity: 0;
@@ -958,17 +969,6 @@ tbody tr:hover {
 .htmx-request.htmx-indicator {
   display: inline-block;
   opacity: 1;
-}
-
-.spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(15, 23, 42, 0.1);
-  border-top-color: var(--accent-purple);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  vertical-align: middle;
 }
 
 @keyframes spin {
