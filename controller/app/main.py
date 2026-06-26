@@ -1209,7 +1209,8 @@ async def api_quick_add(
     request: Request,
     node_id: int,
     ip_cidr: str = Form(...),
-    group_id: int = Form(...),
+    group_id: str = Form(...),
+    new_group_name: str | None = Form(None),
 ):
     ip_cidr = ip_cidr.strip()
     if not validate_ip_cidr(ip_cidr):
@@ -1218,39 +1219,83 @@ async def api_quick_add(
             {"request": request, "toast": {"type": "error", "message": f"无效 IP: {ip_cidr}"}},
         )
 
-    group = await db.get_ip_group(group_id)
-    if not group:
-        return templates.TemplateResponse(
-            "partials/toast.html",
-            {"request": request, "toast": {"type": "error", "message": "IP 分组不存在"}},
-        )
+    resolved_group_id = None
+    group_name = ""
+
+    if group_id == "__new__":
+        if not new_group_name or not new_group_name.strip():
+            return templates.TemplateResponse(
+                "partials/toast.html",
+                {"request": request, "toast": {"type": "error", "message": "新分组名称不能为空"}},
+            )
+        new_group_name = new_group_name.strip()
+        try:
+            existing_groups = await db.get_all_ip_groups()
+            existing_g = None
+            for g in existing_groups:
+                if g["name"].lower() == new_group_name.lower():
+                    existing_g = g
+                    break
+            
+            if existing_g:
+                resolved_group_id = existing_g["id"]
+                group_name = existing_g["name"]
+            else:
+                resolved_group_id = await db.create_ip_group(new_group_name, "从安全日志拦截列表快速创建")
+                group_name = new_group_name
+        except Exception as exc:
+            return templates.TemplateResponse(
+                "partials/toast.html",
+                {"request": request, "toast": {"type": "error", "message": f"创建新分组失败: {exc}"}},
+            )
+    else:
+        try:
+            resolved_group_id = int(group_id)
+        except ValueError:
+            return templates.TemplateResponse(
+                "partials/toast.html",
+                {"request": request, "toast": {"type": "error", "message": "无效的分组 ID"}},
+            )
+        group = await db.get_ip_group(resolved_group_id)
+        if not group:
+            return templates.TemplateResponse(
+                "partials/toast.html",
+                {"request": request, "toast": {"type": "error", "message": "IP 分组不存在"}},
+            )
+        group_name = group["name"]
 
     try:
-        await db.add_ip_group_item(group_id, ip_cidr, "快速添加")
+        await db.add_ip_group_item(resolved_group_id, ip_cidr, "快速添加")
     except Exception as exc:
         if "UNIQUE" in str(exc):
             return templates.TemplateResponse(
                 "partials/toast.html",
-                {"request": request, "toast": {"type": "warning", "message": f"{ip_cidr} 已在组 {group['name']} 中"}},
+                {"request": request, "toast": {"type": "warning", "message": f"{ip_cidr} 已在组 {group_name} 中"}},
             )
-        raise
+        return templates.TemplateResponse(
+            "partials/toast.html",
+            {"request": request, "toast": {"type": "error", "message": f"添加失败: {exc}"}},
+        )
 
     node = await db.get_node(node_id)
     await db.add_op_log(
         node_id, node["name"] if node else "unknown", "QUICK_ADD",
-        ip_cidr, f"快速加入 IP 分组: {group['name']}",
+        ip_cidr, f"快速加入 IP 分组: {group_name}",
+        success=True
     )
 
-    return templates.TemplateResponse(
+    resp = templates.TemplateResponse(
         "partials/toast.html",
         {
             "request": request,
             "toast": {
                 "type": "success",
-                "message": f"已将 {ip_cidr} 快速加入 IP 分组「{group['name']}」",
+                "message": f"已将 {ip_cidr} 快速加入 IP 分组「{group_name}」",
             },
         },
     )
+    resp.headers["HX-Trigger"] = "rules-updated"
+    return resp
 
 
 if __name__ == "__main__":
