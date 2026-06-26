@@ -11,11 +11,11 @@
   <div class="ip-group {% if new_group_id == group.id %}open{% endif %}">
     <!-- Header -->
     <div class="ip-group-header" onclick="this.parentElement.classList.toggle('open')" style="display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; cursor: pointer; transition: background 0.2s ease;">
-      <div class="ip-group-name" style="font-size: 1.15rem; font-weight: 700; color: #fff; display: flex; align-items: center; gap: 10px;">
+      <div class="ip-group-name" style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
         <span class="arrow" style="display: inline-block;">▶</span>
         <span>📦</span>
         {{ group.name }}
-        <span class="count" style="background: rgba(255, 255, 255, 0.05); color: var(--text-secondary); padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{{ group.ips | length }} IP</span>
+        <span class="count" style="background: rgba(15, 23, 42, 0.04); color: var(--text-secondary); padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;">{{ group.ips | length }} IP</span>
       </div>
       <div class="ip-group-meta" style="font-size: 0.85rem; color: var(--text-secondary);">
         {% if group.remark %}
@@ -27,7 +27,7 @@
     </div>
 
     <!-- Body (Collapsible) -->
-    <div class="ip-group-body" style="padding: 24px; border-top: 1px solid rgba(255, 255, 255, 0.06); background: rgba(0, 0, 0, 0.15);">
+    <div class="ip-group-body" style="padding: 24px; border-top: 1px solid var(--border-glass); background: rgba(15, 23, 42, 0.015);">
       
       <!-- IP List Table -->
       {% if group.ips %}
@@ -43,7 +43,7 @@
           <tbody>
             {% for ip in group.ips %}
             <tr>
-              <td class="mono" style="font-size: 0.9rem; color: #fff; font-weight: 600;">{{ ip.ip_cidr }}</td>
+              <td class="mono" style="font-size: 0.9rem; color: var(--text-primary); font-weight: 600;">{{ ip.ip_cidr }}</td>
               <td style="color: var(--text-secondary);">{{ ip.note or '—' }}</td>
               <td style="text-align: right;">
                 <button class="btn btn-danger btn-sm"
@@ -60,7 +60,7 @@
         </table>
       </div>
       {% else %}
-      <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.88rem; font-style: italic; border: 1px dashed rgba(255, 255, 255, 0.05); border-radius: var(--radius-md); margin-bottom: 20px;">
+      <div style="padding: 16px; text-align: center; color: var(--text-muted); font-size: 0.88rem; font-style: italic; border: 1px dashed var(--border-glass); border-radius: var(--radius-md); margin-bottom: 20px;">
         该分组内暂无任何 IP，请在下方添加。
       </div>
       {% endif %}
@@ -70,7 +70,7 @@
             hx-post="/api/ip-groups/{{ group.id }}/ips"
             hx-target="#ip-group-list"
             hx-swap="outerHTML"
-            style="display: flex; gap: 12px; align-items: flex-end; padding-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.06);">
+            style="display: flex; gap: 12px; align-items: flex-end; padding-bottom: 20px; border-bottom: 1px solid var(--border-glass);">
         <div class="form-group" style="flex: 2; margin-bottom: 0;">
           <label class="form-label" style="font-size: 0.72rem;">IP 或 CIDR *</label>
           <input class="form-input mono" name="ip_cidr" placeholder="如 123.45.67.89 或 192.168.1.0/24" required>

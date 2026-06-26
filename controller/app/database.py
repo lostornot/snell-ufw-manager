@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS nodes (
     snell_conf  TEXT DEFAULT '/root/snelldocker/snell-conf/snell.conf',
     remark      TEXT DEFAULT '',
     enabled     INTEGER DEFAULT 1,
+    country     TEXT DEFAULT '',
+    country_code TEXT DEFAULT '',
     created_at  TEXT DEFAULT (datetime('now'))
 );
 
@@ -59,6 +61,15 @@ async def init_db():
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
         await db.executescript(SCHEMA)
+        
+        # Check if country and country_code columns exist, if not add them dynamically
+        cursor = await db.execute("PRAGMA table_info(nodes)")
+        cols = [row[1] for row in await cursor.fetchall()]
+        if "country" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN country TEXT DEFAULT ''")
+        if "country_code" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN country_code TEXT DEFAULT ''")
+            
         await db.commit()
 
 
@@ -94,13 +105,15 @@ async def create_node(
     snell_port: int,
     snell_conf: str,
     remark: str = "",
+    country: str = "",
+    country_code: str = "",
 ) -> int:
     async with _get_db() as db:
         await db.execute("PRAGMA foreign_keys=ON")
         cursor = await db.execute(
-            """INSERT INTO nodes (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark),
+            """INSERT INTO nodes (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark, country, country_code)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (name, host, ssh_port, ssh_user, snell_port, snell_conf, remark, country, country_code),
         )
         await db.commit()
         return cursor.lastrowid

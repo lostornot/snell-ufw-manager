@@ -335,7 +335,7 @@ h1, h2, h3, h4, .font-outfit {
 
 .node-detail-layout {
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 1fr 380px;
   gap: 32px;
   align-items: start;
 }
@@ -370,18 +370,26 @@ h1, h2, h3, h4, .font-outfit {
 }
 
 #port-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* Port Card Design */
 .port-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
+  align-items: center;
   justify-content: space-between;
-  min-height: 240px;
-  padding: 20px;
+  gap: 24px;
+  padding: 16px 20px;
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  transition: var(--transition-smooth);
 }
 
 .port-card-header {
@@ -911,14 +919,14 @@ tbody tr:hover {
 /* Code Copy Setup */
 .code-block {
   position: relative;
-  background: #0f172a;
-  border: 1px solid #1e293b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
   border-radius: var(--radius-sm);
   padding: 16px 20px;
   font-family: var(--font-mono);
   font-size: 0.82rem;
   line-height: 1.6;
-  color: #f1f5f9;
+  color: #0f172a;
   margin-top: 12px;
 }
 
@@ -927,3 +935,27 @@ tbody tr:hover {
   top: 12px;
   right: 12px;
 }
+
+/* Responsive Stacking for Horizontal Port Cards */
+@media (max-width: 992px) {
+  .node-detail-layout {
+    grid-template-columns: 1fr;
+  }
+  .port-card {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+  .port-card > div {
+    width: 100% !important;
+    flex: none !important;
+    min-width: 0 !important;
+  }
+  .port-card div[style*="justify-content: flex-end"] {
+    justify-content: space-between !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+  }
+}
+

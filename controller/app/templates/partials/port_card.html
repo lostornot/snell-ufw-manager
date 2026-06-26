@@ -5,84 +5,77 @@
 </div>
 {% endif %}
 
-<div class="port-card glass-card" id="port-card-{{ data.port }}" style="display: flex; flex-direction: column; justify-content: space-between; min-height: 240px; padding: 20px; position: relative;">
-  <div>
-    <!-- Port Card Header -->
-    <div class="port-card-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
-      <div>
-        <div class="port-number" style="font-size: 1.6rem; font-weight: 800; color: #fff; font-family: var(--font-mono); line-height: 1.1; display: flex; align-items: baseline;">
-          {{ data.port }} <span class="proto-suffix" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-purple); margin-left: 2px;">/{{ data.protocol_label }}</span>
-        </div>
-        
-        <!-- Tag Badge -->
-        {% if data.port | string == node.ssh_port | string or data.port | string == '22' %}
-          <span class="tag tag-info service-tag">🔒 SSH 登录</span>
-        {% elif data.port | string == node.snell_port | string %}
-          <span class="tag tag-warn service-tag">⚡ SNELL 代理</span>
-        {% else %}
-          <span class="tag tag-allow service-tag" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); color: #60a5fa;">⚙️ {{ data.tag | default('自定义规则') }}</span>
-        {% endif %}
-      </div>
-      
-      <!-- Close entire port button -->
-      <button class="btn-close-port"
-              hx-delete="/api/nodes/{{ node.id }}/ports/{{ data.port }}"
-              hx-target="#port-cards-grid"
-              hx-swap="outerHTML"
-              hx-confirm="⚠️ 确定要关闭端口 {{ data.port }} 并删除其下所有放行规则吗？"
-              title="关闭端口（删除该端口所有 UFW 规则）">
-        ✕
-      </button>
+<div class="port-card glass-card" id="port-card-{{ data.port }}">
+  <!-- Left section: Port & Badge -->
+  <div style="flex: 0 0 160px; min-width: 160px;">
+    <div class="port-number" style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); line-height: 1.1; display: flex; align-items: baseline;">
+      {{ data.port }} <span class="proto-suffix" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-purple); margin-left: 2px;">/{{ data.protocol_label }}</span>
     </div>
+    {% if data.port | string == node.ssh_port | string or data.port | string == '22' %}
+      <span class="tag tag-info service-tag" style="margin-top: 4px;">🔒 SSH 登录</span>
+    {% elif data.port | string == node.snell_port | string %}
+      <span class="tag tag-warn service-tag" style="margin-top: 4px;">⚡ SNELL 代理</span>
+    {% else %}
+      <span class="tag tag-allow service-tag" style="background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); color: #60a5fa; margin-top: 4px;">⚙️ {{ data.tag | default('自定义规则') }}</span>
+    {% endif %}
+  </div>
 
-    <!-- Whitelisted IPs -->
-    <div class="whitelist-section" style="flex-grow: 1; margin-bottom: 20px;">
-      <div class="section-label" style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 8px;">
-        已放行源地址
-      </div>
-      
-      <div class="pill-container" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 140px; overflow-y: auto; padding-right: 4px;">
-        {% for rule in data.rules %}
-          <div class="ip-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-sm); padding: 4px 10px;">
-            <span class="ip-address font-mono" style="font-size: 0.85rem; color: var(--text-primary);">
-              {% if rule.ip == 'any' or rule.ip == 'anywhere' or rule.ip == 'Anywhere' %}
-                Anywhere (全局开放)
-              {% else %}
-                {{ rule.ip }}
-              {% endif %}
-            </span>
-            <span class="ip-proto" style="font-size: 0.7rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">{{ rule.proto }}</span>
-            
-            <button class="btn-remove-ip"
-                    hx-delete="/api/nodes/{{ node.id }}/ports/{{ data.port }}/rules/{{ rule.num }}"
-                    hx-target="#port-card-{{ data.port }}"
-                    hx-swap="outerHTML"
-                    hx-confirm="确定删除放行规则：{{ rule.ip }} -> 端口 {{ data.port }} ({{ rule.proto | upper }}) 吗？"
-                    title="删除此规则">
-              ✕
-            </button>
-          </div>
-        {% else %}
-          <span class="no-rules">暂无放行规则</span>
-        {% endfor %}
-      </div>
+  <!-- Middle section: Whitelisted IPs -->
+  <div style="flex: 1 1 auto; min-width: 200px;">
+    <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">
+      已放行源地址
+    </div>
+    <div class="pill-container" style="display: flex; flex-wrap: wrap; gap: 6px; overflow-y: auto; max-height: 80px;">
+      {% for rule in data.rules %}
+        <div class="ip-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.04); border: 1px solid rgba(15, 23, 42, 0.08); border-radius: var(--radius-sm); padding: 2px 8px;">
+          <span class="ip-address font-mono" style="font-size: 0.82rem; color: var(--text-primary);">
+            {% if rule.ip == 'any' or rule.ip == 'anywhere' or rule.ip == 'Anywhere' %}
+              Anywhere (全局)
+            {% else %}
+              {{ rule.ip }}
+            {% endif %}
+          </span>
+          <span class="ip-proto" style="font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">{{ rule.proto }}</span>
+          <button class="btn-remove-ip"
+                  hx-delete="/api/nodes/{{ node.id }}/ports/{{ data.port }}/rules/{{ rule.num }}"
+                  hx-target="#port-card-{{ data.port }}"
+                  hx-swap="outerHTML"
+                  hx-confirm="确定删除放行规则：{{ rule.ip }} -> 端口 {{ data.port }} ({{ rule.proto | upper }}) 吗？"
+                  title="删除此规则">
+            ✕
+          </button>
+        </div>
+      {% else %}
+        <span class="no-rules" style="font-size: 0.82rem;">暂无放行规则</span>
+      {% endfor %}
     </div>
   </div>
 
-  <!-- Quick Add IP Form -->
-  <div class="port-card-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.06); padding-top: 16px;">
+  <!-- Right section: Quick Add Form & Action -->
+  <div style="display: flex; align-items: center; gap: 16px; flex: 0 0 300px; min-width: 300px; justify-content: flex-end;">
     <form hx-post="/api/nodes/{{ node.id }}/ports/{{ data.port }}/ips"
           hx-target="#port-card-{{ data.port }}"
           hx-swap="outerHTML"
           class="form-quick-add"
-          style="display: flex; gap: 8px;">
+          style="display: flex; gap: 8px; margin: 0; width: 240px; flex-shrink: 0;">
       <input type="text" 
              name="ip_cidr" 
              class="form-input mono" 
              placeholder="IP/CIDR 或 IP分组名" 
              required
-             style="flex-grow: 1; font-size: 0.82rem; padding: 6px 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: var(--radius-sm); color: var(--text-primary);">
-      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 6px 14px; font-weight: 600; font-size: 0.8rem;">+ 放行</button>
+             style="font-size: 0.82rem; padding: 6px 12px; height: 32px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); flex-grow: 1;">
+      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-weight: 600; font-size: 0.8rem; height: 32px; white-space: nowrap; flex-shrink: 0;">+ 放行</button>
     </form>
+
+    <!-- Close Port Button -->
+    <button class="btn-close-port"
+            hx-delete="/api/nodes/{{ node.id }}/ports/{{ data.port }}"
+            hx-target="#port-cards-grid"
+            hx-swap="outerHTML"
+            hx-confirm="⚠️ 确定要关闭端口 {{ data.port }} 并删除其下所有放行规则吗？"
+            title="关闭端口（删除该端口所有 UFW 规则）"
+            style="width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; cursor: pointer; color: var(--text-muted); transition: var(--transition-smooth); flex-shrink: 0;">
+      ✕
+    </button>
   </div>
 </div>

@@ -113,14 +113,31 @@ else
     echo "  输出: $RESULT"
 fi
 
+# 8. 检测公网 IP
+echo -n "  检测本机公网 IP... "
+NODE_IP=$(curl -s -m 4 https://api.ipify.org || curl -s -m 4 https://ifconfig.me || curl -s -m 4 https://ipinfo.io/ip || echo "无法获取")
+if [ "$NODE_IP" != "无法获取" ]; then
+    echo "$NODE_IP ✓"
+else
+    echo "未获取到"
+fi
+
 echo ""
 echo "══════════════════════════════════════════"
 echo " ✅ 节点初始化完成"
-echo " 请回到控制面板，输入本机 IP 点击「发现并添加」"
-echo "══════════════════════════════════════════"</code>
+if [ "$NODE_IP" != "无法获取" ]; then
+    echo " 本机公网 IP: $NODE_IP"
+    echo " 请回到控制面板，输入以上 IP 并点击「发现并添加」"
+else
+    echo " 请回到控制面板，输入本机公网 IP 并点击「发现并添加」"
+fi
+echo "══════════════════════════════════════════"
+</code>
 </div>
-<p class="text-secondary text-sm mt-2">
-  💡 复制上方完整脚本，在落地 VPS 上以 <strong>root</strong> 粘贴执行。完成后回到第二步输入 IP 添加节点。
+<p class="text-secondary text-sm mt-2" style="line-height: 1.6; margin-top: 12px;">
+  💡 复制上方完整脚本，在落地 VPS 上以 <strong>root</strong> 粘贴执行。<br>
+  🖥️ 您的当前浏览器/客户端公网 IP 为：<strong class="mono" style="color: var(--accent-purple);">{{ client_ip }}</strong> (可在放行端口时关联到白名单中)<br>
+  ⚙️ 控制中心 (Controller) 公网 IP 为：<strong class="mono" style="color: var(--accent-blue);">{{ ctrl_ip }}</strong> (初始化脚本已自动将该 IP 加入主机的 SSH 放行规则)
 </p>
 {% else %}
 <div class="empty-state" style="color:var(--warning);">

@@ -3,7 +3,7 @@
     <!-- Card Header: Node Hostname & Active Status Pulse -->
     <div class="node-card-header" style="margin-bottom: 16px;">
       <div>
-        <h3 class="node-card-name" style="font-size: 1.2rem; font-weight: 700; color: #fff;">
+        <h3 class="node-card-name" style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">
           {{ node.name }}
         </h3>
         <span class="mono text-muted" style="font-size: 0.8rem;">{{ node.host }}</span>
@@ -43,7 +43,7 @@
 
   <!-- Footer Tag-list of active ports -->
   {% if status.online %}
-  <div class="node-card-footer" style="border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 16px; padding-top: 16px;">
+  <div class="node-card-footer" style="border-top: 1px solid var(--border-glass); margin-top: 16px; padding-top: 16px;">
     <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
       活动放行端口 (UFW 已启用)
     </div>
