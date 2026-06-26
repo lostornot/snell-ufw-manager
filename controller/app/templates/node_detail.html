@@ -141,11 +141,13 @@
               <div class="multiselect-dropdown">
                 {% for n in all_nodes %}
                   {% if n.id != node.id %}
-                  <label class="multiselect-item" onclick="event.stopPropagation();">
-                    <input type="checkbox" name="target_node_ids" value="{{ n.id }}" onchange="updateSelectedCount()">
-                    <span>{{ get_flag_emoji(n.country_code) }}</span>
-                    <span style="font-weight: 500;">{{ n.name }}</span>
-                    <span class="text-secondary" style="font-size: 0.78rem;">({{ n.host }})</span>
+                  <label class="multiselect-item" onclick="event.stopPropagation();" style="align-items: center;">
+                    <input type="checkbox" name="target_node_ids" value="{{ n.id }}" onchange="updateSelectedCount()" style="flex-shrink: 0;">
+                    <span style="font-size: 1.15rem; flex-shrink: 0; line-height: 1;">{{ get_flag_emoji(n.country_code) }}</span>
+                    <div style="display: flex; flex-direction: column; min-width: 0; flex-grow: 1; line-height: 1.25;">
+                      <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ n.name }}">{{ n.name }}</span>
+                      <span class="text-muted mono" style="font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ n.host }}</span>
+                    </div>
                   </label>
                   {% endif %}
                 {% endfor %}
