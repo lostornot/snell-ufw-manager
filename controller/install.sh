@@ -67,6 +67,10 @@ info "完成"
 # 3. Create virtual environment
 # ---------------------------------------------------
 echo -n "  创建 Python 虚拟环境... "
+if [ -d "${VENV_DIR}" ] && [ ! -f "${VENV_DIR}/bin/pip" ]; then
+    warn "发现残缺的 venv，重建中..."
+    rm -rf "${VENV_DIR}"
+fi
 if [ ! -d "${VENV_DIR}" ]; then
     python3 -m venv "${VENV_DIR}"
     info "完成"
