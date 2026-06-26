@@ -33,10 +33,7 @@
       <button class="btn btn-secondary"
               hx-post="/api/nodes/{{ node.id }}/test"
               hx-target="#toast-container"
-              hx-swap="beforeend">
-        <span class="spinner htmx-indicator"></span>
-        🔗 测试 SSH 连接
-      </button>
+              hx-swap="beforeend"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>测试 SSH 连接</button>
     </div>
   </div>
 </div>
@@ -55,9 +52,7 @@
         <button class="btn btn-ghost btn-sm"
                 hx-get="/api/nodes/{{ node.id }}/ports"
                 hx-target="#port-cards-grid"
-                hx-swap="innerHTML">
-          <span class="spinner htmx-indicator"></span> 刷新规则
-        </button>
+                hx-swap="innerHTML"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>🔄 刷新规则</button>
       </div>
       
       <!-- Port Cards Grid Target -->
@@ -80,9 +75,7 @@
         <button class="btn btn-ghost btn-sm"
                 hx-get="/partials/nodes/{{ node.id }}/access-log"
                 hx-target="#access-log"
-                hx-swap="innerHTML">
-          <span class="spinner htmx-indicator"></span> 刷新日志
-        </button>
+                hx-swap="innerHTML"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>🔄 刷新日志</button>
       </div>
       <div id="access-log">
         <div class="loading-overlay"
@@ -147,10 +140,7 @@
         </div>
         
         <div style="margin-top: 24px;">
-          <button type="submit" class="btn btn-primary w-full">
-            <span class="spinner htmx-indicator" id="open-port-spinner" style="margin-right: 6px;"></span>
-            确认部署放行规则
-          </button>
+          <button type="submit" class="btn btn-primary w-full" style="justify-content: center;"><span class="spinner htmx-indicator" id="open-port-spinner" style="margin-right: 6px;"></span>确认部署放行规则</button>
         </div>
       </form>
     </div>
