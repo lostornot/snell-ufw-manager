@@ -778,13 +778,18 @@ async def api_discover_node(
     request: Request,
     host: str = Form(...),
     ssh_port: int = Form(22),
-    snell_port: int | None = Form(None),
+    snell_port: str = Form(""),
 ):
+    try:
+        parsed_snell_port = int(snell_port) if snell_port.strip() else 0
+    except ValueError:
+        parsed_snell_port = 0
+
     node_stub = {
         "host": host.strip(),
         "ssh_port": ssh_port,
         "ssh_user": "snellmgr",
-        "snell_port": snell_port or 0,
+        "snell_port": parsed_snell_port,
     }
 
     # Test SSH connection
@@ -805,8 +810,8 @@ async def api_discover_node(
             },
         )
 
-    if snell_port is not None and snell_port > 0:
-        final_snell_port = snell_port
+    if parsed_snell_port > 0:
+        final_snell_port = parsed_snell_port
     else:
         node_stub["snell_conf"] = config.snell.default_conf_path
         port_result = await ssh.get_snell_port(node_stub)

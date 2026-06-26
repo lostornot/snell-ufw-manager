@@ -106,7 +106,7 @@ fi
 # 7. 测试
 echo -n "  测试 snell-fwctl... "
 RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/snell-fwctl status 2>&1)
-if echo "$RESULT" | grep -q '"ok":true'; then
+if echo "$RESULT" | grep -q '"ok": true'; then
     echo "通过 ✓"
 else
     echo "失败 ✗"
