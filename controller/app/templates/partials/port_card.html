@@ -7,7 +7,7 @@
 
 <div class="port-card glass-card" id="port-card-{{ data.port }}">
   <!-- Left section: Port & Badge -->
-  <div style="flex: 0 0 140px; min-width: 140px;">
+  <div style="flex: 0 0 130px; min-width: 130px;">
     <div class="port-number" style="font-size: 1.5rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); line-height: 1.1; display: flex; align-items: baseline;">
       {{ data.port }} <span class="proto-suffix" style="font-size: 0.85rem; font-weight: 600; color: var(--accent-purple); margin-left: 2px;">/{{ data.protocol_label }}</span>
     </div>
@@ -21,7 +21,7 @@
   </div>
 
   <!-- Middle section: Whitelisted IPs -->
-  <div style="flex: 1 1 auto; min-width: 150px;">
+  <div style="flex: 1 1 auto; min-width: 120px;">
     <div style="font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin-bottom: 4px;">
       已放行源地址
     </div>
@@ -52,19 +52,19 @@
   </div>
 
   <!-- Right section: Quick Add Form & Action -->
-  <div style="display: flex; align-items: center; gap: 16px; flex: 0 0 280px; min-width: 280px; justify-content: flex-end;">
+  <div style="display: flex; align-items: center; gap: 12px; flex: 0 0 240px; min-width: 240px; justify-content: flex-end;">
     <form hx-post="/api/nodes/{{ node.id }}/ports/{{ data.port }}/ips"
           hx-target="#port-card-{{ data.port }}"
           hx-swap="outerHTML"
           class="form-quick-add"
-          style="display: flex; gap: 8px; margin: 0; width: 240px; flex-shrink: 0;">
+          style="display: flex; gap: 8px; margin: 0; width: 190px; flex-shrink: 0;">
       <input type="text" 
              name="ip_cidr" 
              class="form-input mono" 
              placeholder="IP/CIDR 或 IP分组名" 
              required
-             style="font-size: 0.82rem; padding: 6px 12px; height: 32px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); flex-grow: 1;">
-      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 6px 12px; font-weight: 600; font-size: 0.8rem; height: 32px; white-space: nowrap; flex-shrink: 0;">+ 放行</button>
+             style="font-size: 0.82rem; padding: 6px 10px; height: 32px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); flex-grow: 1;">
+      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 6px 10px; font-weight: 600; font-size: 0.8rem; height: 32px; white-space: nowrap; flex-shrink: 0;">+ 放行</button>
     </form>
 
     <!-- Close Port Button -->

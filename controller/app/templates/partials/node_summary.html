@@ -1,40 +1,37 @@
-<div class="glass-card node-card group cursor-pointer" id="node-card-{{ node.id }}">
+<div class="glass-card node-card group cursor-pointer" id="node-card-{{ node.id }}" style="padding: 12px; min-height: 100px;">
   <div>
     <!-- Card Header: Node Hostname & Active Status Pulse -->
-    <div class="node-card-header" style="margin-bottom: 12px;">
+    <div class="node-card-header" style="margin-bottom: 8px;">
       <div>
-        <h3 class="node-card-name" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
+        <h3 class="node-card-name" style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">
           {{ node.name }}
         </h3>
-        <span class="mono text-muted" style="font-size: 0.8rem;">{{ node.host }}</span>
+        <span class="mono text-muted" style="font-size: 0.78rem;">{{ node.host }}</span>
       </div>
       <!-- Status Badge -->
       {% if status.online %}
-      <div class="status-badge">
+      <div class="status-badge" style="padding: 2px 8px;">
         <span class="status-dot online"></span>
-        <span style="font-size: 0.75rem;">ONLINE</span>
+        <span style="font-size: 0.7rem;">ONLINE</span>
       </div>
       {% else %}
-      <div class="status-badge offline">
+      <div class="status-badge offline" style="padding: 2px 8px;">
         <span class="status-dot offline"></span>
-        <span style="font-size: 0.75rem;">OFFLINE</span>
+        <span style="font-size: 0.7rem;">OFFLINE</span>
       </div>
       {% endif %}
     </div>
 
     <!-- Metadata & Connectivity -->
-    <div class="node-card-meta">
+    <div class="node-card-meta" style="gap: 4px;">
       {% if status.online %}
-      <div class="row">
-        <span class="text-secondary" style="font-size: 0.85rem;">在线时长:</span>
-        <span style="color: var(--text-primary); font-size: 0.85rem;">{{ status.uptime }}</span>
-      </div>
-      <div class="row">
-        <span class="text-secondary" style="font-size: 0.85rem;">系统内核:</span>
-        <span class="mono" style="color: var(--text-primary); font-size: 0.82rem;">{{ status.kernel }}</span>
+      <div class="row" style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+        <span>运行: {{ status.uptime }}</span>
+        <span style="color: var(--border-glass);">|</span>
+        <span class="mono" style="font-size: 0.78rem;">{{ status.kernel }}</span>
       </div>
       {% else %}
-      <div class="row text-secondary" style="font-size: 0.85rem; color: var(--accent-red) !important; font-weight: 500;">
+      <div class="row text-secondary" style="font-size: 0.8rem; color: var(--accent-red) !important; font-weight: 500;">
         ⚠️ 无法连接: {{ status.error }}
       </div>
       {% endif %}
@@ -43,19 +40,19 @@
 
   <!-- Footer Tag-list of active ports -->
   {% if status.online %}
-  <div class="node-card-footer" style="border-top: 1px solid var(--border-glass); margin-top: 12px; padding-top: 12px;">
-    <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
-      活动放行端口 (UFW 已启用)
+  <div class="node-card-footer" style="border-top: 1px solid var(--border-glass); margin-top: 8px; padding-top: 8px;">
+    <div style="font-size: 0.68rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;">
+      活动放行端口
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 6px;">
       {% if status.ports %}
         {% for p in status.ports %}
-        <span class="tag tag-info mono" style="font-size: 0.75rem; padding: 2px 8px;">
+        <span class="tag tag-info mono" style="font-size: 0.7rem; padding: 1px 6px;">
           {{ p }}
         </span>
         {% endfor %}
       {% else %}
-        <span class="no-rules">无活动端口</span>
+        <span class="no-rules" style="font-size: 0.75rem;">无活动端口</span>
       {% endif %}
     </div>
   </div>
