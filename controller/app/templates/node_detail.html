@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}{{ node.name }} — Snell UFW Manager{% endblock %}
+
+{% block content %}
+<a href="/" class="back-link">← 返回仪表盘</a>
+
+<!-- Node Header -->
+<div class="node-header">
+  <div class="node-header-info">
+    <h1>
+      <span class="status-dot unknown"></span>
+      {{ node.name }}
+    </h1>
+    <div class="node-header-badges">
+      <span class="tag tag-info mono">{{ node.host }}:{{ node.ssh_port }}</span>
+      <span class="tag tag-info">Snell: {{ node.snell_port }}</span>
+      {% if node.remark %}
+      <span class="tag" style="background:var(--tag-bg);color:var(--tag-text);">{{ node.remark }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="node-header-actions">
+    <button class="btn btn-secondary"
+            hx-post="/api/nodes/{{ node.id }}/test"
+            hx-target="#toast-container"
+            hx-swap="beforeend">
+      <span class="spinner htmx-indicator"></span>
+      🔗 测试连接
+    </button>
+    <button class="btn btn-primary"
+            hx-post="/api/nodes/{{ node.id }}/sync"
+            hx-target="#toast-container"
+            hx-swap="beforeend"
+            hx-confirm="确定将白名单同步到 {{ node.name }}？">
+      <span class="spinner htmx-indicator"></span>
+      🔄 同步到节点
+    </button>
+  </div>
+</div>
+
+<!-- Relay Group Association -->
+<div class="card section">
+  <div class="card-header">
+    <div class="card-title"><span>🔗</span> 已关联中转组</div>
+  </div>
+  <form hx-put="/api/nodes/{{ node.id }}/relay-groups"
+        hx-target="#toast-container"
+        hx-swap="beforeend">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
+      {% for group in all_groups %}
+      <label class="checkbox-label">
+        <input type="checkbox" name="group_ids" value="{{ group.id }}"
+               {% if group.id in node_group_ids %}checked{% endif %}>
+        {{ group.name }}
+        <span class="group-meta">{{ group.ips | length }} IP</span>
+      </label>
+      {% else %}
+      <p class="text-secondary text-sm">还没有中转组，去 <a href="/relay-groups">创建一个</a></p>
+      {% endfor %}
+    </div>
+    {% if all_groups %}
+    <div class="mt-3 flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <span class="spinner htmx-indicator"></span>
+        💾 保存关联
+      </button>
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<!-- Expected IPs (from DB) -->
+<div class="card section">
+  <div class="card-header">
+    <div class="card-title">
+      <span>📋</span> 应有白名单
+      <span class="count">{{ allowed_ips | length }}</span>
+    </div>
+  </div>
+  {% if allowed_ips %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>IP / CIDR</th>
+          <th>备注</th>
+          <th>来源组</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ip in allowed_ips %}
+        <tr>
+          <td class="mono">{{ ip.ip_cidr }}</td>
+          <td class="text-secondary">{{ ip.note or '—' }}</td>
+          <td><span class="applied-node-tag">{{ ip.group_name }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>没有关联任何中转组的 IP</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Live Whitelist (from UFW via SSH) -->
+<div class="card section">
+  <div class="section-header">
+    <div class="card-title"><span>🛡️</span> 实际 UFW 规则</div>
+    <button class="btn btn-ghost btn-sm"
+            hx-get="/partials/nodes/{{ node.id }}/whitelist"
+            hx-target="#live-whitelist"
+            hx-swap="innerHTML">
+      <span class="spinner htmx-indicator"></span>
+      🔄 刷新
+    </button>
+  </div>
+  <div id="live-whitelist">
+    <div class="loading-overlay"
+         hx-get="/partials/nodes/{{ node.id }}/whitelist"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+      <span class="spinner"></span> 正在从节点获取 UFW 规则...
+    </div>
+  </div>
+</div>
+
+<!-- Access Log (from UFW log via SSH) -->
+<div class="card section">
+  <div class="section-header">
+    <div class="card-title"><span>👁️</span> 最近访问 ({{ access_log_hours }}h)</div>
+    <button class="btn btn-ghost btn-sm"
+            hx-get="/partials/nodes/{{ node.id }}/access-log?hours={{ access_log_hours }}"
+            hx-target="#access-log"
+            hx-swap="innerHTML">
+      <span class="spinner htmx-indicator"></span>
+      🔄 刷新
+    </button>
+  </div>
+  <div id="access-log">
+    <div class="loading-overlay"
+         hx-get="/partials/nodes/{{ node.id }}/access-log?hours={{ access_log_hours }}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+      <span class="spinner"></span> 正在从节点获取访问日志...
+    </div>
+  </div>
+</div>
+
+<!-- Operation Log -->
+<div class="card section">
+  <div class="card-header">
+    <div class="card-title">
+      <span>📋</span> 操作日志
+      <span class="count">{{ logs | length }}</span>
+    </div>
+    <button class="btn btn-ghost btn-sm"
+            hx-get="/partials/nodes/{{ node.id }}/op-log"
+            hx-target="#op-log"
+            hx-swap="innerHTML">
+      🔄 刷新
+    </button>
+  </div>
+  <div id="op-log">
+    {% include "partials/op_log.html" %}
+  </div>
+</div>
+{% endblock %}

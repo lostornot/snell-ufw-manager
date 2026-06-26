@@ -1,0 +1,7 @@
+<!-- Toast trigger: parsed by JS in base.html to show a notification -->
+{% if toast %}
+<div class="toast-trigger hidden"
+     data-message="{{ toast.message }}"
+     data-type="{{ toast.type | default('success') }}">
+</div>
+{% endif %}

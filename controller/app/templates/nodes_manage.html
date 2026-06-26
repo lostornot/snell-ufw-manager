@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% set active_page = "nodes_manage" %}
+
+{% block title %}节点管理 — Snell UFW Manager{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <span class="icon">🖥️</span> 节点管理
+</div>
+
+<!-- Add Node Form -->
+<div class="card mb-3">
+  <div class="card-title mb-2"><span>➕</span> 添加节点</div>
+  <form hx-post="/api/nodes"
+        hx-target="#node-manage-list"
+        hx-swap="outerHTML">
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">名称 *</label>
+        <input class="form-input" name="name" placeholder="如：美国落地-01" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">IP / 主机名 *</label>
+        <input class="form-input" name="host" placeholder="1.2.3.4" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">SSH 端口</label>
+        <input class="form-input" name="ssh_port" type="number" value="22">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">SSH 用户名</label>
+        <input class="form-input" name="ssh_user" value="snellmgr">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Snell 端口 *</label>
+        <input class="form-input" name="snell_port" type="number" placeholder="28261" required>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Snell 配置路径</label>
+        <input class="form-input" name="snell_conf" value="{{ default_snell_conf }}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">备注</label>
+      <input class="form-input" name="remark" placeholder="可选备注">
+    </div>
+    <button type="submit" class="btn btn-primary">
+      <span class="spinner htmx-indicator"></span>
+      添加节点
+    </button>
+  </form>
+</div>
+
+<!-- Node List + Setup Script -->
+<div id="node-manage-list">
+  {% include "partials/node_manage_list.html" %}
+</div>
+{% endblock %}

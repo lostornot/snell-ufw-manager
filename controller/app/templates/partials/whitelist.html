@@ -1,0 +1,60 @@
+<!-- Whitelist partial: live UFW rules from node -->
+{% if result and result.ok %}
+  {% set rules = result.rules | default([]) %}
+  {% set unique_ips = [] %}
+  {% for rule in rules %}
+    {% if rule.ip not in unique_ips %}
+      {% if unique_ips.append(rule.ip) %}{% endif %}
+    {% endif %}
+  {% endfor %}
+
+  {% if rules %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>IP / CIDR</th>
+          <th>协议</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ip in unique_ips %}
+        {% set in_db = ip in allowed_set %}
+        <tr class="{% if not in_db %}drift-row{% endif %}">
+          <td class="mono">{{ ip }}</td>
+          <td>
+            {% set protos = [] %}
+            {% for rule in rules if rule.ip == ip %}
+              {% if protos.append(rule.proto) %}{% endif %}
+            {% endfor %}
+            {{ protos | join(' + ') }}
+          </td>
+          <td>
+            {% if in_db %}
+              <span class="tag tag-allow">✓ 在白名单</span>
+            {% else %}
+              <span class="tag tag-warn">⚠ 漂移规则</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-secondary text-sm mt-2">共 {{ rules | length }} 条规则，{{ unique_ips | length }} 个 IP</p>
+  {% else %}
+  <div class="empty-state">
+    <p>该端口暂无 UFW 白名单规则</p>
+  </div>
+  {% endif %}
+
+{% elif result %}
+  <div class="empty-state" style="color:var(--error);">
+    <p>❌ 获取失败: {{ result.error }}</p>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <p>加载中...</p>
+  </div>
+{% endif %}

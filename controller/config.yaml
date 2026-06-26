@@ -1,0 +1,17 @@
+server:
+  host: "127.0.0.1"
+  port: 8899
+
+ssh:
+  private_key_path: "/root/.ssh/snellmgr_ed25519"
+  connect_timeout: 10
+  command_timeout: 30
+
+snell:
+  default_conf_path: "/root/snelldocker/snell-conf/snell.conf"
+
+backup:
+  max_per_node: 20
+
+log:
+  access_log_hours: 24

@@ -1,0 +1,67 @@
+<!-- Access log partial: recent IPs that accessed/tried to access Snell port -->
+{% if result and result.ok %}
+  {% set candidates = result.candidates | default([]) %}
+  {% if candidates %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>IP</th>
+          <th>状态</th>
+          <th>次数</th>
+          <th>最近时间</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in candidates %}
+        {% set in_whitelist = c.ip in allowed_set %}
+        <tr>
+          <td class="mono">{{ c.ip }}</td>
+          <td>
+            {% if c.action == "ALLOW" %}
+              <span class="tag tag-allow">✅ 允许</span>
+            {% else %}
+              <span class="tag tag-block">❌ 拦截</span>
+            {% endif %}
+          </td>
+          <td>{{ c.count }}</td>
+          <td class="text-secondary text-sm">{{ c.last_seen }}</td>
+          <td>
+            {% if not in_whitelist %}
+            <form style="display:inline;" hx-post="/api/nodes/{{ node.id }}/quick-add"
+                  hx-target="#toast-container" hx-swap="beforeend">
+              <input type="hidden" name="ip_cidr" value="{{ c.ip }}">
+              <select name="group_id" class="form-select" style="width:auto;display:inline;padding:3px 8px;font-size:0.8rem;">
+                {% for group in all_groups %}
+                <option value="{{ group.id }}">{{ group.name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-success btn-sm" title="加入中转组">
+                + 加入
+              </button>
+            </form>
+            {% else %}
+            <span class="text-secondary text-sm">已在白名单</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>该时间段内没有访问记录</p>
+  </div>
+  {% endif %}
+
+{% elif result %}
+  <div class="empty-state" style="color:var(--error);">
+    <p>❌ 获取失败: {{ result.error }}</p>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <p>加载中...</p>
+  </div>
+{% endif %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% set active_page = "dashboard" %}
+
+{% block title %}仪表盘 — Snell UFW Manager{% endblock %}
+
+{% block content %}
+<div class="page-title">
+  <span class="icon">📊</span> 节点总览
+</div>
+
+<!-- Node Cards Grid -->
+<div class="node-grid">
+  {% for node in nodes %}
+  <a href="/nodes/{{ node.id }}" style="text-decoration:none;color:inherit;">
+    <div class="node-card">
+      <div class="node-card-header">
+        <span class="status-dot unknown" id="status-dot-{{ node.id }}"></span>
+        <span class="node-card-name">{{ node.name }}</span>
+      </div>
+      <div class="node-card-meta">
+        <div class="row">
+          <span>🌐</span>
+          <span class="mono">{{ node.host }}</span>
+        </div>
+        <div class="row">
+          <span>🔌</span>
+          <span>Snell: <strong class="mono">{{ node.snell_port }}</strong></span>
+        </div>
+        {% if node.remark %}
+        <div class="row">
+          <span>📝</span>
+          <span>{{ node.remark }}</span>
+        </div>
+        {% endif %}
+      </div>
+      <div class="node-card-actions">
+        <span class="btn btn-secondary btn-sm">管理 →</span>
+      </div>
+    </div>
+  </a>
+  {% else %}
+  <div class="empty-state" style="grid-column: 1 / -1;">
+    <div class="icon">🖥️</div>
+    <p>还没有节点，去 <a href="/nodes/manage">节点管理</a> 添加一个</p>
+  </div>
+  {% endfor %}
+</div>
+
+<!-- Recent Operations -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">
+      <span>📋</span> 最近操作
+      <span class="count">{{ logs | length }}</span>
+    </div>
+    <a href="/logs" class="btn btn-ghost btn-sm">查看全部 →</a>
+  </div>
+  {% if logs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>时间</th>
+          <th>节点</th>
+          <th>操作</th>
+          <th>目标</th>
+          <th>状态</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+          <td class="text-secondary text-sm">{{ log.created_at }}</td>
+          <td>{{ log.node_name or '—' }}</td>
+          <td><span class="tag tag-info">{{ log.action }}</span></td>
+          <td class="mono">{{ log.target or '—' }}</td>
+          <td>
+            {% if log.success %}
+              <span class="tag tag-allow">✓ 成功</span>
+            {% else %}
+              <span class="tag tag-block">✗ 失败</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <p>暂无操作记录</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
