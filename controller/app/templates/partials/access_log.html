@@ -6,46 +6,46 @@
     <table>
       <thead>
         <tr>
-          <th>IP</th>
-          <th>目标端口</th>
-          <th>状态</th>
-          <th>次数</th>
-          <th>最近时间 (台湾时区)</th>
-          <th>操作</th>
+          <th style="white-space: nowrap;">IP</th>
+          <th style="white-space: nowrap;">目标端口</th>
+          <th style="white-space: nowrap;">状态</th>
+          <th style="white-space: nowrap;">次数</th>
+          <th style="white-space: nowrap;">最近时间 (台湾时区)</th>
+          <th style="white-space: nowrap;">操作</th>
         </tr>
       </thead>
       <tbody>
         {% for c in candidates %}
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
-          <td class="mono">{{ c.ip }}</td>
-          <td class="mono"><span class="tag tag-info" style="background:var(--accent-blue-trans);color:var(--accent-blue);padding:2px 6px;border-radius:4px;font-size:0.8rem;">{{ node.snell_port }}</span></td>
-          <td>
+          <td class="mono" style="white-space: nowrap;">{{ c.ip }}</td>
+          <td class="mono" style="white-space: nowrap;"><span class="tag tag-info" style="background:var(--accent-blue-trans);color:var(--accent-blue);padding:2px 6px;border-radius:4px;font-size:0.8rem;white-space: nowrap;">{{ node.snell_port }}</span></td>
+          <td style="white-space: nowrap;">
             {% if c.action == "ALLOW" %}
-              <span class="tag tag-allow">✅ 允许</span>
+              <span class="tag tag-allow" style="white-space: nowrap;">✅ 允许</span>
             {% else %}
-              <span class="tag tag-block">❌ 拦截</span>
+              <span class="tag tag-block" style="white-space: nowrap;">❌ 拦截</span>
             {% endif %}
           </td>
-          <td>{{ c.count }}</td>
-          <td class="text-secondary text-sm">{{ c.last_seen }}</td>
-          <td>
+          <td style="white-space: nowrap;">{{ c.count }}</td>
+          <td class="text-secondary text-sm" style="white-space: nowrap;">{{ c.last_seen }}</td>
+          <td style="white-space: nowrap;">
             {% if not in_whitelist %}
-            <form style="display:inline;align-items:center;gap:4px;" hx-post="/api/nodes/{{ node.id }}/quick-add"
+            <form style="display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;white-space: nowrap;" hx-post="/api/nodes/{{ node.id }}/quick-add"
                   hx-target="#toast-container" hx-swap="beforeend">
               <input type="hidden" name="ip_cidr" value="{{ c.ip }}">
-              <span class="text-secondary" style="font-size:0.75rem;margin-right:2px;">添加到组:</span>
-              <select name="group_id" class="form-select" style="width:auto;display:inline;padding:3px 8px;font-size:0.8rem;" title="选择要加入的 IP 分组">
+              <span class="text-secondary" style="font-size:0.75rem;white-space: nowrap;">添加到组:</span>
+              <select name="group_id" class="form-select" style="width:auto;display:inline-block;padding:3px 8px;font-size:0.8rem;white-space: nowrap;height:28px;" title="选择要加入的 IP 分组">
                 {% for group in all_groups %}
                 <option value="{{ group.id }}">{{ group.name }}</option>
                 {% endfor %}
               </select>
-              <button type="submit" class="btn btn-success btn-sm" title="将该 IP 加入选中的 IP 分组">
+              <button type="submit" class="btn btn-success btn-sm" style="white-space: nowrap;height:28px;padding:2px 8px;" title="将该 IP 加入选中的 IP 分组">
                 + 加入
               </button>
             </form>
             {% else %}
-            <span class="text-secondary text-sm">已在白名单</span>
+            <span class="text-secondary text-sm" style="white-space: nowrap;">已在白名单</span>
             {% endif %}
           </td>
         </tr>

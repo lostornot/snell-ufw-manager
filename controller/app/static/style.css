@@ -701,6 +701,7 @@ h1, h2, h3, h4, .font-outfit {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border: 1px solid transparent;
+  white-space: nowrap;
 }
 
 .tag-info {
