@@ -5,10 +5,40 @@ APP_DIR="${APP_DIR:-/opt/snell-ufw-manager-by-gpt}"
 SERVICE_NAME="snell-ufw-control.service"
 BIND_HOST="${BIND_HOST:-127.0.0.1}"
 BIND_PORT="${BIND_PORT:-8898}"
+SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ ! -f "$SOURCE_DIR/pyproject.toml" ]]; then
+  printf 'ERROR: %s does not look like the project root; pyproject.toml not found.\n' "$SOURCE_DIR" >&2
+  exit 1
+fi
 
 install -d -m 0755 "$APP_DIR"
 install -d -m 700 "$APP_DIR/data"
 chmod 700 "$APP_DIR/data"
+
+if command -v rsync >/dev/null 2>&1; then
+  rsync -a --delete \
+    --exclude=.git \
+    --exclude=.venv \
+    --exclude=.pytest_cache \
+    --exclude='*.egg-info' \
+    --exclude='__pycache__' \
+    --exclude=.DS_Store \
+    --exclude=.env \
+    --exclude=data \
+    "$SOURCE_DIR/" "$APP_DIR/"
+else
+  tar -C "$SOURCE_DIR" \
+    --exclude=.git \
+    --exclude=.venv \
+    --exclude=.pytest_cache \
+    --exclude='*.egg-info' \
+    --exclude='__pycache__' \
+    --exclude=.DS_Store \
+    --exclude=.env \
+    --exclude=data \
+    -cf - . | tar -C "$APP_DIR" -xf -
+fi
 
 if [[ ! -f "$APP_DIR/.env" ]]; then
   ADMIN_TOKEN="$(python3 - <<'PY'
@@ -42,7 +72,7 @@ python3 -m venv "$APP_DIR/.venv"
 "$APP_DIR/.venv/bin/pip" install "$APP_DIR"
 
 install -d -m 0755 /etc/systemd/system
-install -m 0644 "systemd/$SERVICE_NAME" "/etc/systemd/system/$SERVICE_NAME"
+install -m 0644 "$APP_DIR/systemd/$SERVICE_NAME" "/etc/systemd/system/$SERVICE_NAME"
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 

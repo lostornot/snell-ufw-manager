@@ -33,6 +33,13 @@ def test_node_installer_uses_single_restricted_nopasswd_entrypoint() -> None:
 def test_controller_installer_generates_secrets_and_protects_data() -> None:
     script = read("scripts/install-controller.sh")
 
+    assert "SOURCE_DIR=" in script
+    assert "--exclude=.git" in script
+    assert "--exclude=.venv" in script
+    assert "--exclude=.env" in script
+    assert "--exclude=data" in script
+    assert "pyproject.toml" in script
+    assert "rsync" in script
     assert "ADMIN_TOKEN" in script
     assert "SESSION_SECRET" in script
     assert "chmod 700" in script
