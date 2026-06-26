@@ -1,9 +1,9 @@
-<div class="glass-card p-6 flex flex-col justify-between h-full group cursor-pointer" id="node-card-{{ node.id }}">
+<div class="glass-card node-card group cursor-pointer" id="node-card-{{ node.id }}">
   <div>
     <!-- Card Header: Node Hostname & Active Status Pulse -->
-    <div class="node-card-header" style="margin-bottom: 16px;">
+    <div class="node-card-header" style="margin-bottom: 12px;">
       <div>
-        <h3 class="node-card-name" style="font-size: 1.2rem; font-weight: 700; color: var(--text-primary);">
+        <h3 class="node-card-name" style="font-size: 1.05rem; font-weight: 700; color: var(--text-primary);">
           {{ node.name }}
         </h3>
         <span class="mono text-muted" style="font-size: 0.8rem;">{{ node.host }}</span>
@@ -43,7 +43,7 @@
 
   <!-- Footer Tag-list of active ports -->
   {% if status.online %}
-  <div class="node-card-footer" style="border-top: 1px solid var(--border-glass); margin-top: 16px; padding-top: 16px;">
+  <div class="node-card-footer" style="border-top: 1px solid var(--border-glass); margin-top: 12px; padding-top: 12px;">
     <div style="font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
       活动放行端口 (UFW 已启用)
     </div>
