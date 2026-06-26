@@ -14,17 +14,17 @@
     class="btn btn-primary"
     onclick="window.location.reload();"
   >
-    🔄 刷新页面
+    刷新页面
   </button>
 </header>
 
 <div style="display: flex; gap: 8px; margin-bottom: 24px; align-items: center; justify-content: flex-start; flex-wrap: wrap;">
   <span style="font-size: 0.9rem; color: var(--text-secondary); font-weight: 500;">🗺️ 视图选项：</span>
   <a href="/?group=none" class="btn {% if group == 'none' or not group %}btn-primary{% else %}btn-ghost{% endif %} btn-sm" style="text-decoration: none;">
-    🌐 全部节点
+    全部节点
   </a>
   <a href="/?group=country" class="btn {% if group == 'country' %}btn-primary{% else %}btn-ghost{% endif %} btn-sm" style="text-decoration: none;">
-    📍 按国家分组
+    按国家分组
   </a>
 </div>
 
@@ -100,7 +100,7 @@
   <div class="glass-card empty-state" style="padding: 40px; text-align: center;">
     <div style="font-size: 2.5rem; margin-bottom: 12px;">🖥️</div>
     <p style="color: var(--text-secondary); margin-bottom: 16px;">当前没有配置任何 VPS 节点。</p>
-    <a href="/nodes/manage" class="btn btn-primary">➕ 添加第一个节点</a>
+    <a href="/nodes/manage" class="btn btn-primary">添加第一个节点</a>
   </div>
 {% endif %}
 

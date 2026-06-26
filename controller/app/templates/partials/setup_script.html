@@ -1,7 +1,7 @@
 <!-- Setup script partial — loaded via HTMX into the node manage page -->
 {% if pubkey %}
 <div class="code-block" style="max-height:300px;overflow-y:auto;">
-  <button class="btn btn-ghost btn-sm copy-btn" onclick="copySetupScript(this)">📋 复制整个脚本</button>
+  <button class="btn btn-ghost btn-sm copy-btn" onclick="copySetupScript(this)">复制整个脚本</button>
   <code id="setup-script-content">#!/bin/bash
 # Snell UFW Manager — 节点初始化脚本
 # 在落地 VPS 上以 root 运行
