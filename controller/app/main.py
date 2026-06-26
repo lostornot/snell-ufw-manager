@@ -185,25 +185,10 @@ async def dashboard(request: Request):
     if updated_any:
         nodes = await db.get_all_nodes()
         
-    # Group nodes by country
-    from collections import defaultdict
-    grouped = defaultdict(list)
-    for node in nodes:
-        c = node.get("country") or "未知地区"
-        cc = node.get("country_code") or "XX"
-        flag = get_flag_emoji(cc)
-        grouped[(c, cc, flag)].append(node)
-        
-    # Sort groups: put "未知地区" at the end, others alphabetically
-    sorted_groups = sorted(
-        grouped.items(),
-        key=lambda x: (x[0][0] == "未知地区" or x[0][0] == "", x[0][0])
-    )
-    
     logs = await db.get_op_logs(limit=10)
     return templates.TemplateResponse(
         "dashboard.html",
-        {"request": request, "sorted_groups": sorted_groups, "logs": logs},
+        {"request": request, "nodes": nodes, "logs": logs},
     )
 
 

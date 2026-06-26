@@ -18,39 +18,33 @@
   </button>
 </header>
 
-<!-- Grouped Node Cards by Country -->
-{% for (country, country_code, flag), country_nodes in sorted_groups %}
-<div class="country-section" style="margin-bottom: 32px;">
-  <h2 style="font-size: 1.35rem; color: var(--text-primary); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--border-glass); padding-bottom: 8px;">
-    <span style="font-size: 1.5rem;">{{ flag }}</span>
-    {{ country }} 
-    <span class="badge" style="margin-left: 4px;">{{ country_nodes | length }}</span>
-  </h2>
-  
-  <div class="node-grid">
-    {% for node in country_nodes %}
-    <a href="/nodes/{{ node.id }}" style="text-decoration: none; color: inherit; display: block;">
-      <div 
-        class="glass-card" 
-        id="node-card-{{ node.id }}" 
-        hx-get="/api/nodes/{{ node.id }}/summary" 
-        hx-trigger="load" 
-        hx-swap="outerHTML"
-        style="min-height: 100px; display: flex; flex-direction: column; justify-content: space-between; padding: 12px;"
-      >
-        <!-- Loading Skeleton -->
-        <div class="node-card-header" style="margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-          <span class="node-card-name" style="font-size: 1rem;">{{ node.name }}</span>
-          <span class="spinner"></span>
+{% if nodes %}
+<div class="node-grid">
+  {% for node in nodes %}
+  <a href="/nodes/{{ node.id }}" style="text-decoration: none; color: inherit; display: block;">
+    <div 
+      class="glass-card" 
+      id="node-card-{{ node.id }}" 
+      hx-get="/api/nodes/{{ node.id }}/summary" 
+      hx-trigger="load" 
+      hx-swap="outerHTML"
+      style="min-height: 80px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; padding: 12px 16px;"
+    >
+      <!-- Loading Skeleton (Horizontal style) -->
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span style="font-size: 1.2rem;">{{ get_flag_emoji(node.country_code) }}</span>
+          <span class="node-card-name" style="font-size: 1rem; font-weight: 700; color: var(--text-primary);">{{ node.name }}</span>
         </div>
-        <div class="node-card-meta">
-          <div class="row" style="font-size: 0.82rem; color: var(--text-secondary);">🌐 <span class="mono">{{ node.host }}</span></div>
-          <div class="row text-secondary" style="font-size: 0.8rem; font-style: italic; margin-top: 4px;">正在获取 UFW 状态...</div>
-        </div>
+        <div class="mono text-muted" style="font-size: 0.8rem;">🌐 {{ node.host }}</div>
       </div>
-    </a>
-    {% endfor %}
-  </div>
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <span class="spinner"></span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);">正在获取 UFW 状态...</span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
 </div>
 {% else %}
 <div class="glass-card empty-state" style="padding: 40px; text-align: center;">
@@ -58,6 +52,6 @@
   <p style="color: var(--text-secondary); margin-bottom: 16px;">当前没有配置任何 VPS 节点。</p>
   <a href="/nodes/manage" class="btn btn-primary">➕ 添加第一个节点</a>
 </div>
-{% endfor %}
+{% endif %}
 
 {% endblock %}
