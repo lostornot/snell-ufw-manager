@@ -1012,6 +1012,72 @@ async def partial_node_edit(request: Request, node_id: int):
     )
 
 
+@app.get("/partials/nodes/{node_id}/header", response_class=HTMLResponse)
+async def partial_node_header(request: Request, node_id: int):
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return templates.TemplateResponse(
+        "partials/node_detail_header.html",
+        {"request": request, "node": node},
+    )
+
+
+@app.get("/partials/nodes/{node_id}/header/edit", response_class=HTMLResponse)
+async def partial_node_header_edit(request: Request, node_id: int):
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return templates.TemplateResponse(
+        "partials/node_detail_header_edit.html",
+        {"request": request, "node": node},
+    )
+
+
+@app.put("/api/nodes/{node_id}/header", response_class=HTMLResponse)
+async def api_update_node_header(
+    request: Request,
+    node_id: int,
+    name: str = Form(...),
+    host: str = Form(...),
+    ssh_port: int = Form(22),
+    ssh_user: str = Form("snellmgr"),
+    snell_port: int = Form(...),
+    snell_conf: str = Form(""),
+    tags: str = Form(""),
+    remark: str = Form(""),
+):
+    node = await db.get_node(node_id)
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+    
+    country = node.get("country", "")
+    country_code = node.get("country_code", "")
+    if host.strip() != node["host"]:
+        country, country_code = await get_ip_country(host)
+        
+    await db.update_node(
+        node_id,
+        name=name.strip(),
+        host=host.strip(),
+        ssh_port=ssh_port,
+        ssh_user=ssh_user.strip(),
+        snell_port=snell_port,
+        snell_conf=snell_conf.strip(),
+        tags=tags.strip(),
+        remark=remark.strip(),
+        country=country,
+        country_code=country_code,
+    )
+    
+    updated_node = await db.get_node(node_id)
+    toast = {"type": "success", "message": f"✅ 节点 {name} 的配置已成功更新"}
+    return templates.TemplateResponse(
+        "partials/node_detail_header.html",
+        {"request": request, "node": updated_node, "toast": toast},
+    )
+
+
 @app.get("/api/nodes/setup-script", response_class=PlainTextResponse)
 async def api_setup_script():
     pubkey = ssh.get_public_key()

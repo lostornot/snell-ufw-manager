@@ -1,0 +1,54 @@
+<div class="glass-card" id="node-header-card" style="margin-bottom: 32px; padding: 24px;">
+  <form hx-put="/api/nodes/{{ node.id }}/header"
+        hx-target="#node-header-card"
+        hx-swap="outerHTML"
+        style="display: flex; flex-direction: column; gap: 16px;">
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">节点名称 *</label>
+        <input class="form-input" name="name" value="{{ node.name }}" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">IP 地址 / 域名 *</label>
+        <input class="form-input mono" name="host" value="{{ node.host }}" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">SSH 端口 *</label>
+        <input class="form-input mono" name="ssh_port" type="number" value="{{ node.ssh_port }}" required>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">SNELL 端口 *</label>
+        <input class="form-input mono" name="snell_port" type="number" value="{{ node.snell_port }}" required>
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">节点标签 (用逗号分隔，例如：中转机,落地机)</label>
+        <input class="form-input" name="tags" value="{{ node.tags or '' }}" placeholder="例如：中转机, 落地机">
+      </div>
+      <div class="form-group" style="margin-bottom: 0;">
+        <label class="form-label">备注说明</label>
+        <input class="form-input" name="remark" value="{{ node.remark or '' }}" placeholder="该主机的额外说明">
+      </div>
+    </div>
+
+    <!-- Hidden fields to preserve unchanged settings -->
+    <input type="hidden" name="ssh_user" value="{{ node.ssh_user }}">
+    <input type="hidden" name="snell_conf" value="{{ node.snell_conf }}">
+
+    <div style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px;">
+      <button type="button" class="btn btn-secondary"
+              hx-get="/partials/nodes/{{ node.id }}/header"
+              hx-target="#node-header-card"
+              hx-swap="outerHTML">
+        ❌ 取消
+      </button>
+      <button type="submit" class="btn btn-primary">
+        <span class="spinner htmx-indicator" style="margin-right: 6px;"></span>
+        💾 保存
+      </button>
+    </div>
+  </form>
+</div>

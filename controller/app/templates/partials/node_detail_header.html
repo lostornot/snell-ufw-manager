@@ -1,0 +1,48 @@
+<div class="glass-card" id="node-header-card" style="margin-bottom: 32px; padding: 24px;">
+  {% if toast %}
+  <div class="toast-trigger hidden"
+       data-message="{{ toast.message }}"
+       data-type="{{ toast.type | default('success') }}">
+  </div>
+  {% endif %}
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+    <div>
+      <h1 style="font-size: 1.8rem; color: var(--text-primary); display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap;">
+        <span class="status-dot unknown"
+              hx-get="/api/nodes/{{ node.id }}/ping"
+              hx-trigger="load"
+              hx-swap="outerHTML"></span>
+        {{ node.name }}
+        <button class="btn btn-ghost btn-sm"
+                hx-get="/partials/nodes/{{ node.id }}/header/edit"
+                hx-target="#node-header-card"
+                hx-swap="outerHTML"
+                style="padding: 4px 8px; margin-left: 8px; font-weight: normal; font-size: 0.75rem; border-radius: 6px;">
+          ✏️ 编辑信息
+        </button>
+      </h1>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+        <span class="tag tag-info">📍 {{ get_flag_emoji(node.country_code) }} {{ node.country or '未知地区' }}</span>
+        <span class="tag tag-info mono">连接地址: {{ node.host }}:{{ node.ssh_port }}</span>
+        <span class="tag tag-info">默认 SNELL 端口: {{ node.snell_port }}</span>
+        {% if node.tags %}
+          {% for tag in node.tags.split(',') %}
+            {% if tag.strip() %}
+            <span class="tag-node">🏷️ {{ tag.strip() }}</span>
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+        {% if node.remark %}
+        <span class="tag tag-default">备注: {{ node.remark }}</span>
+        {% endif %}
+      </div>
+    </div>
+    
+    <div>
+      <button class="btn btn-secondary"
+              hx-post="/api/nodes/{{ node.id }}/test"
+              hx-target="#toast-container"
+              hx-swap="beforeend"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>测试 SSH 连接</button>
+    </div>
+  </div>
+</div>
