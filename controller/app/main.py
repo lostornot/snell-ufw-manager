@@ -790,9 +790,19 @@ async def api_discover_node(
     # Test SSH connection
     status = await ssh.test_connection(node_stub)
     if not status.get("ok"):
+        nodes = await db.get_all_nodes()
+        pubkey = ssh.get_public_key()
+        ctrl_ip = ssh.get_controller_ip()
         return templates.TemplateResponse(
-            "partials/toast.html",
-            {"request": request, "toast": {"type": "error", "message": f"❌ SSH 连接失败: {status.get('error', 'unknown')}"}},
+            "partials/node_manage_list.html",
+            {
+                "request": request,
+                "nodes": nodes,
+                "pubkey": pubkey,
+                "ctrl_ip": ctrl_ip,
+                "default_snell_conf": config.snell.default_conf_path,
+                "toast": {"type": "error", "message": f"❌ SSH 连接失败: {status.get('error', 'unknown')}"},
+            },
         )
 
     if snell_port is not None and snell_port > 0:
