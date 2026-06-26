@@ -37,12 +37,5 @@
         {% endif %}
       </div>
     </div>
-    
-    <div>
-      <button class="btn btn-secondary"
-              hx-post="/api/nodes/{{ node.id }}/test"
-              hx-target="#toast-container"
-              hx-swap="beforeend"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>测试 SSH 连接</button>
-    </div>
   </div>
 </div>
