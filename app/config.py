@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     host: str = Field(default="127.0.0.1", alias="HOST")
-    port: int = Field(default=8899, alias="PORT")
+    port: int = Field(default=8898, alias="PORT")
     data_dir: Path = Field(default=Path("data"), alias="DATA_DIR")
     database_url: str = Field(
         default="sqlite:///data/snell-ufw-control.db",

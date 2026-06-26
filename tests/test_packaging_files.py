@@ -13,7 +13,7 @@ def test_controller_service_binds_localhost_only() -> None:
     service = read("systemd/snell-ufw-control.service")
 
     assert "127.0.0.1" in service
-    assert "8899" in service
+    assert "8898" in service
     assert "0.0.0.0" not in service
 
 

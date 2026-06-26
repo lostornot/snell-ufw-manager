@@ -14,16 +14,16 @@
 
 ## Access Model
 
-The controller binds to `127.0.0.1:8899` by default. Access it through SSH Tunnel:
+The controller binds to `127.0.0.1:8898` by default. Access it through SSH Tunnel:
 
 ```bash
-ssh -L 8899:127.0.0.1:8899 controller-host
+ssh -L 8898:127.0.0.1:8898 controller-host
 ```
 
 Then open:
 
 ```text
-http://127.0.0.1:8899
+http://127.0.0.1:8898
 ```
 
 The controller still requires an admin token, signed session cookie, and CSRF protection for state-changing requests.

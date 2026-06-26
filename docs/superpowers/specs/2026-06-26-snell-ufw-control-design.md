@@ -8,7 +8,7 @@ The project is intentionally narrow:
 
 - Manage Snell installation, configuration, service state, and logs on multiple VPS nodes.
 - Manage Snell-port UFW allowlists through relay groups and node policies.
-- Run the Control Center only on `127.0.0.1:8899`.
+- Run the Control Center only on `127.0.0.1:8898`.
 - Access the Control Center through an SSH Tunnel.
 - Avoid becoming a general VPS panel or a public web management surface.
 
@@ -27,7 +27,7 @@ The project is intentionally narrow:
 ```mermaid
 flowchart LR
     User["User Browser"] --> Tunnel["SSH Tunnel"]
-    Tunnel --> Web["FastAPI Web UI<br/>127.0.0.1:8899"]
+    Tunnel --> Web["FastAPI Web UI<br/>127.0.0.1:8898"]
     Web --> Services["Business Services"]
     Services --> DB["SQLite"]
     Services --> SSH["OpenSSH subprocess"]
@@ -78,7 +78,7 @@ snell-ufw-control/
 
 ## Security Model
 
-- The web service defaults to `127.0.0.1:8899`.
+- The web service defaults to `127.0.0.1:8898`.
 - The project does not open a public management port.
 - Users access the UI through SSH Tunnel.
 - The controller still requires minimal authentication and CSRF protection. Localhost binding is not treated as authentication.
@@ -600,14 +600,14 @@ Candidates are hints, not trusted recommendations. Scanners, incomplete UDP logs
 - generate `ADMIN_TOKEN` and `SESSION_SECRET` when absent;
 - install the systemd service;
 - default bind host to `127.0.0.1`;
-- default port to `8899`.
+- default port to `8898`.
 
 ## systemd Service
 
 The controller unit should run the FastAPI app through a production-capable server command and bind to:
 
 ```text
-127.0.0.1:8899
+127.0.0.1:8898
 ```
 
 The service should not bind to `0.0.0.0` by default.

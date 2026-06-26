@@ -19,7 +19,7 @@ def test_dashboard_renders_local_only_product_name(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert "snell-ufw-control" in response.text
-    assert "127.0.0.1:8899" in response.text
+    assert "127.0.0.1:8898" in response.text
 
 
 def test_core_skeleton_pages_render(monkeypatch) -> None:

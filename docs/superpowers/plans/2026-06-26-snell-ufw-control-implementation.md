@@ -66,7 +66,7 @@ pip install -e ".[dev]"
 
 Expected: editable install succeeds.
 
-- [ ] Implement `app/config.py` with defaults `HOST=127.0.0.1`, `PORT=8899`, `DATA_DIR=data`, `DATABASE_URL=sqlite:///data/snell-ufw-control.db`, `ADMIN_TOKEN`, and `SESSION_SECRET`.
+- [ ] Implement `app/config.py` with defaults `HOST=127.0.0.1`, `PORT=8898`, `DATA_DIR=data`, `DATABASE_URL=sqlite:///data/snell-ufw-control.db`, `ADMIN_TOKEN`, and `SESSION_SECRET`.
 
 - [ ] Implement `app/db.py` with `engine`, `SessionLocal`, `Base`, `get_db()`, and `init_db()`.
 
@@ -381,7 +381,7 @@ Expected: all M7 tests pass.
   - create database file mode `600`;
   - generate `ADMIN_TOKEN` and `SESSION_SECRET` when absent;
   - install systemd service;
-  - bind to `127.0.0.1:8899` by default.
+  - bind to `127.0.0.1:8898` by default.
 
 - [ ] Implement `install-node.sh`:
   - check `python3`;
@@ -393,7 +393,7 @@ Expected: all M7 tests pass.
   - validate sudoers syntax;
   - print SSH config alias guidance.
 
-- [ ] Implement `systemd/snell-ufw-control.service` with bind host `127.0.0.1` and port `8899`.
+- [ ] Implement `systemd/snell-ufw-control.service` with bind host `127.0.0.1` and port `8898`.
 
 - [ ] Write README with:
   - project scope and non-goals;
@@ -428,7 +428,7 @@ Expected: all syntax checks pass.
 
 ## Final Verification Before Release
 
-- [ ] Confirm web service defaults to `127.0.0.1:8899`.
+- [ ] Confirm web service defaults to `127.0.0.1:8898`.
 - [ ] Confirm no React, Vue, or Node.js dependency was added.
 - [ ] Confirm SSH executor never uses `shell=True`.
 - [ ] Confirm sudoers grants only `/usr/local/sbin/snell-fwctl`.

@@ -12,7 +12,7 @@
 
 ## Setup and Run Commands
 - Install local dev env: `python3 -m venv .venv && . .venv/bin/activate && pip install -e ".[dev]"`
-- Run controller locally: `.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8899`
+- Run controller locally: `.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8898`
 - Test all: `.venv/bin/pytest -v`
 - Test M1 models/validation: `.venv/bin/pytest tests/test_models.py tests/test_validation.py -v`
 - Syntax check scripts: `bash -n scripts/install-controller.sh && bash -n scripts/install-node.sh`
@@ -35,7 +35,7 @@
 - No React, Vue, or Node.js for V1.
 
 ## Project-Specific Rules
-- Web service must default to `127.0.0.1:8899`.
+- Web service must default to `127.0.0.1:8898`.
 - Access is intended through SSH Tunnel.
 - Controller must still require minimal authentication, session cookies, and CSRF protection for state-changing requests.
 - Do not add a public management port.
