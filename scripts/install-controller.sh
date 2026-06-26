@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="${APP_DIR:-/opt/snell-ufw-control}"
+APP_DIR="${APP_DIR:-/opt/snell-ufw-manager-by-gpt}"
 SERVICE_NAME="snell-ufw-control.service"
 BIND_HOST="${BIND_HOST:-127.0.0.1}"
 BIND_PORT="${BIND_PORT:-8898}"

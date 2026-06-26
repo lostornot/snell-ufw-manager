@@ -18,8 +18,7 @@ def test_dashboard_renders_local_only_product_name(monkeypatch) -> None:
     response = client.get("/")
 
     assert response.status_code == 200
-    assert "snell-ufw-control" in response.text
-    assert "by GPT" in response.text
+    assert "snell-ufw-manager-by-gpt" in response.text
     assert "127.0.0.1:8898" in response.text
 
 

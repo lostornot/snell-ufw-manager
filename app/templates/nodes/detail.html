@@ -26,8 +26,8 @@
   <p class="muted">添加节点只会登记连接信息。新 VPS 需要先安装节点侧受限工具，之后面板才能通过 SSH 调用 <code>snell-fwctl</code>。</p>
   <ul class="code-list">
     <li>ssh root@{{ node.host or "&lt;node-ip&gt;" }}</li>
-    <li>git clone https://github.com/lostornot/snell-ufw-manager.git</li>
-    <li>cd snell-ufw-manager &amp;&amp; sudo scripts/install-node.sh</li>
+    <li>git clone -b GPT-5.5 https://github.com/lostornot/snell-ufw-manager.git snell-ufw-manager-by-gpt</li>
+    <li>cd snell-ufw-manager-by-gpt &amp;&amp; sudo scripts/install-node.sh</li>
   </ul>
   <p class="muted">安装后确认 SSH 配置使用 <code>snellmgr</code> 用户，或在 OpenSSH config 里配置 alias，再回到这里执行检查。</p>
   <div class="button-row">

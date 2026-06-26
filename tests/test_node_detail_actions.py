@@ -260,6 +260,7 @@ def test_node_detail_shows_bootstrap_steps_and_latest_check(monkeypatch, tmp_pat
 
     assert "节点初始化" in detail.text
     assert "scripts/install-node.sh" in detail.text
+    assert "snell-ufw-manager-by-gpt" in detail.text
     assert "snellmgr" in detail.text
     assert 'action="/nodes/1/check-environment"' in detail.text
     assert "snell-fwctl" in detail.text

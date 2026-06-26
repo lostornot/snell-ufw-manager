@@ -31,14 +31,18 @@ The controller still requires an admin token, signed session cookie, and CSRF pr
 ## Controller Install
 
 ```bash
+git clone -b GPT-5.5 https://github.com/lostornot/snell-ufw-manager.git snell-ufw-manager-by-gpt
+cd snell-ufw-manager-by-gpt
 sudo scripts/install-controller.sh
 ```
 
-The installer creates `data/` with mode `700`, stores the SQLite database with mode `600`, and generates `ADMIN_TOKEN` and `SESSION_SECRET` in `.env` when absent.
+The installer uses `/opt/snell-ufw-manager-by-gpt` by default, creates `data/` with mode `700`, stores the SQLite database with mode `600`, and generates `ADMIN_TOKEN` and `SESSION_SECRET` in `.env` when absent.
 
 ## Node Install
 
 ```bash
+git clone -b GPT-5.5 https://github.com/lostornot/snell-ufw-manager.git snell-ufw-manager-by-gpt
+cd snell-ufw-manager-by-gpt
 sudo scripts/install-node.sh
 ```
 

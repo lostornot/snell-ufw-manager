@@ -4,12 +4,11 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/snell-ufw-control
-EnvironmentFile=/opt/snell-ufw-control/.env
-ExecStart=/opt/snell-ufw-control/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8898
+WorkingDirectory=/opt/snell-ufw-manager-by-gpt
+EnvironmentFile=/opt/snell-ufw-manager-by-gpt/.env
+ExecStart=/opt/snell-ufw-manager-by-gpt/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8898
 Restart=on-failure
 RestartSec=3
 
 [Install]
 WantedBy=multi-user.target
-

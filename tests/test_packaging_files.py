@@ -14,6 +14,7 @@ def test_controller_service_binds_localhost_only() -> None:
 
     assert "127.0.0.1" in service
     assert "8898" in service
+    assert "/opt/snell-ufw-manager-by-gpt" in service
     assert "0.0.0.0" not in service
 
 
@@ -37,6 +38,7 @@ def test_controller_installer_generates_secrets_and_protects_data() -> None:
     assert "chmod 700" in script
     assert "chmod 600" in script
     assert "127.0.0.1" in script
+    assert "/opt/snell-ufw-manager-by-gpt" in script
 
 
 def test_readme_documents_security_model() -> None:
