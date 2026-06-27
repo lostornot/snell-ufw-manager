@@ -959,12 +959,21 @@ async def render_single_port_card(request: Request, node: dict, port: int, toast
         "rules": port_rules
     }
 
-    # Get IP remarks for display
+    # Get IP remarks and geodata for display
     ip_remarks = await db.get_ip_remarks_map()
+    port_ips = [r["ip"] for r in port_rules if r.get("ip")]
+    ip_geos = await get_bulk_ip_geo(port_ips)
 
     resp = templates.TemplateResponse(
         "partials/port_card.html",
-        {"request": request, "node": node, "data": data, "toast": toast, "ip_remarks": ip_remarks},
+        {
+            "request": request, 
+            "node": node, 
+            "data": data, 
+            "toast": toast, 
+            "ip_remarks": ip_remarks,
+            "ip_geos": ip_geos
+        },
     )
     resp.headers["HX-Trigger"] = "rules-updated"
     return resp

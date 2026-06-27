@@ -27,8 +27,8 @@
     </div>
     <div class="pill-container" style="display: flex; flex-wrap: wrap; gap: 6px;">
       {% for rule in data.rules %}
-        <div class="ip-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.04); border: 1px solid rgba(15, 23, 42, 0.08); border-radius: var(--radius-sm); padding: 2px 8px;">
-          <span class="ip-address font-mono" style="font-size: 0.82rem; color: var(--text-primary);">
+        <div class="ip-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.04); border: 1px solid rgba(15, 23, 42, 0.08); border-radius: var(--radius-sm); padding: 3px 8px; white-space: nowrap;">
+          <span class="ip-address font-mono" style="font-size: 0.82rem; color: var(--text-primary); font-weight: 600;">
             {% if rule.ip == 'any' or rule.ip == 'anywhere' or rule.ip == 'Anywhere' %}
               Anywhere (全局)
             {% else %}
@@ -37,9 +37,16 @@
           </span>
           {% if ip_geos is defined and rule.ip in ip_geos %}
             {% set geo = ip_geos[rule.ip] %}
-            <span style="font-size: 0.72rem; color: var(--text-muted); cursor: help; display: inline-flex; align-items: center; gap: 2px;"
-                  title="国家: {{ geo.country }}&#10;城市: {{ geo.city }}&#10;运营商/ASN: {{ geo.asn }}">
-              {{ geo.flag }} <span style="font-size: 0.65rem; color: var(--text-secondary);">{{ geo.city }}</span>
+            <span style="font-size: 0.7rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 3px;"
+                  title="国家: {{ geo.country }} | 城市: {{ geo.city }} | 运营商/ASN: {{ geo.asn }}">
+              <span>{{ geo.flag }}</span>
+              <span>{{ geo.country }}</span>
+              {% if geo.asn %}
+                <span style="opacity: 0.6;">•</span>
+                <span style="font-size: 0.68rem; font-family: var(--font-mono);">
+                  {{ geo.asn | replace('AS', '') | truncate(15, True) }}
+                </span>
+              {% endif %}
             </span>
           {% endif %}
           {% if rule.ip != 'any' and rule.ip != 'anywhere' and rule.ip != 'Anywhere' %}
