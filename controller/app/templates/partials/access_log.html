@@ -36,9 +36,7 @@
     <table>
       <thead>
         <tr>
-          <th style="white-space: nowrap;">IP</th>
-          <th style="white-space: nowrap;">归属地</th>
-          <th style="white-space: nowrap;">网络/ASN</th>
+          <th style="white-space: nowrap;">IP / 归属网络</th>
           <th style="white-space: nowrap;">标签</th>
           <th style="white-space: nowrap;">目标端口</th>
           <th style="white-space: nowrap;">状态</th>
@@ -52,26 +50,23 @@
         {% set rule_port = c.port | default(node.snell_port) %}
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
-          <td class="mono" style="white-space: nowrap;">{{ c.ip }}</td>
-          <td style="white-space: nowrap;">
-            {% if ip_geos is defined and c.ip in ip_geos %}
-              {% set geo = ip_geos[c.ip] %}
-              <span style="font-size: 0.85rem;" title="{{ geo.country }} {{ geo.city }}">
-                {{ geo.flag }} {{ geo.country }} {{ geo.city }}
-              </span>
-            {% else %}
-              <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
-            {% endif %}
-          </td>
-          <td style="white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis;" 
-              title="{% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].asn }}{% endif %}">
-            {% if ip_geos is defined and c.ip in ip_geos %}
-              <span style="font-size: 0.78rem; color: var(--text-secondary);">
-                {{ ip_geos[c.ip].asn | replace('AS', '') }}
-              </span>
-            {% else %}
-              <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
-            {% endif %}
+          <td>
+            <div style="display: flex; flex-direction: column; gap: 3px; justify-content: center; min-height: 38px; padding: 2px 0;">
+              <span class="mono" style="font-size: 0.9rem; font-weight: 600; color: var(--text-primary); line-height: 1.2;">{{ c.ip }}</span>
+              {% if ip_geos is defined and c.ip in ip_geos %}
+                {% set geo = ip_geos[c.ip] %}
+                <span style="font-size: 0.72rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 4px; line-height: 1.2;" 
+                      title="国家: {{ geo.country }} | 城市: {{ geo.city }} | 运营商/ASN: {{ geo.asn }}">
+                  <span>{{ geo.flag }}</span>
+                  <span>{{ geo.country }} {{ geo.city }}</span>
+                  {% if geo.asn %}
+                    <span style="font-family: var(--font-mono); opacity: 0.8; font-size: 0.68rem;">
+                      ({{ geo.asn | replace('AS', '') | truncate(15, True) }})
+                    </span>
+                  {% endif %}
+                </span>
+              {% endif %}
+            </div>
           </td>
           <td>
             {% if c.ip != 'any' and c.ip != 'anywhere' and c.ip != 'Anywhere' %}
