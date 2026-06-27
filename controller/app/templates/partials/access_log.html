@@ -50,22 +50,38 @@
         {% set rule_port = c.port | default(node.snell_port) %}
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
-          <td style="white-space: nowrap; padding: 8px 12px; vertical-align: middle;">
-            <div style="display: flex; flex-direction: column; gap: 4px; justify-content: center; min-height: 40px; white-space: nowrap;">
-              <span class="mono" style="font-size: 0.92rem; font-weight: 600; color: var(--text-primary); line-height: 1.1;">{{ c.ip }}</span>
+          <td style="white-space: nowrap; padding: 10px 12px; vertical-align: middle;">
+            <div style="display: flex; flex-direction: column; gap: 4px; justify-content: center; min-height: 50px; white-space: nowrap;">
+              <!-- Line 1: IP Address -->
+              <span class="mono" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.1;">{{ c.ip }}</span>
               {% if ip_geos is defined and c.ip in ip_geos %}
                 {% set geo = ip_geos[c.ip] %}
-                <div style="font-size: 0.7rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; line-height: 1.1; white-space: nowrap; opacity: 0.88;"
-                     title="国家: {{ geo.country }}&#10;城市: {{ geo.city }}&#10;运营商/ASN: {{ geo.asn }}">
+                <!-- Line 2: Country -->
+                <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; line-height: 1.1; opacity: 0.92;">
                   <span>{{ geo.flag }}</span>
-                  <span style="font-weight: 500;">{{ geo.country }}</span>
-                  {% if geo.asn %}
-                    <span style="color: var(--text-muted); opacity: 0.6;">•</span>
-                    <span style="font-size: 0.68rem; color: var(--text-muted); font-family: var(--font-mono);">
-                      {{ geo.asn | replace('AS', '') | truncate(15, True) }}
-                    </span>
-                  {% endif %}
+                  <span style="font-weight: 600;">{{ geo.country }}</span>
                 </div>
+                <!-- Line 3: City (if exists) -->
+                {% if geo.city %}
+                <div style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; line-height: 1.1; margin-left: 2px;">
+                  <span>📍</span>
+                  <span>{{ geo.city }}</span>
+                </div>
+                {% endif %}
+                <!-- Line 4: ASN Code -->
+                {% if geo.asn_code %}
+                <div style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono); display: flex; align-items: center; gap: 4px; line-height: 1.1; margin-left: 2px;">
+                  <span>🔢</span>
+                  <span>{{ geo.asn_code }}</span>
+                </div>
+                {% endif %}
+                <!-- Line 5: Network Provider Org -->
+                {% if geo.asn_org %}
+                <div style="font-size: 0.65rem; color: var(--text-secondary); opacity: 0.8; display: flex; align-items: center; gap: 4px; line-height: 1.1; margin-left: 2px; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="{{ geo.asn_org }}">
+                  <span>🏢</span>
+                  <span>{{ geo.asn_org }}</span>
+                </div>
+                {% endif %}
               {% endif %}
             </div>
           </td>

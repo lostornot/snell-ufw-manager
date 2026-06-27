@@ -54,7 +54,7 @@ def _sync_get_ip_geo(host: str) -> tuple[str, str, str, str]:
 
 
 async def get_ip_geo_info(ip: str) -> dict:
-    """Get IP geo location and ASN info, hitting local cache database first."""
+    """Get IP geo location and ASN info, hitting local cache database first, and auto-bypassing '未知地区' dirty records."""
     h = ip.strip()
     if "/" in h:
         h = h.split("/")[0]
@@ -65,19 +65,32 @@ async def get_ip_geo_info(ip: str) -> dict:
             "country_code": "CN",
             "flag": "💻",
             "city": "本地",
-            "asn": "Private IP"
+            "asn": "Private IP",
+            "asn_code": "",
+            "asn_org": "Private IP"
         }
 
     # 1. Check database cache
     try:
         cached = await db.get_cached_ip_geo(h)
-        if cached:
+        # ONLY accept cache if it has valid resolved values (not "未知地区" or empty)
+        if cached and cached.get("country") not in ("未知地区", "未知", "") and cached.get("country_code") not in ("XX", ""):
+            asn_full = cached.get("asn") or ""
+            asn_code = ""
+            asn_org = ""
+            if asn_full:
+                parts = asn_full.split(" ", 1)
+                asn_code = parts[0]
+                if len(parts) > 1:
+                    asn_org = parts[1]
             return {
-                "country": cached.get("country") or "未知地区",
-                "country_code": cached.get("country_code") or "XX",
+                "country": cached.get("country"),
+                "country_code": cached.get("country_code"),
                 "flag": get_flag_emoji(cached.get("country_code")),
                 "city": cached.get("city") or "",
-                "asn": cached.get("asn") or "",
+                "asn": asn_full,
+                "asn_code": asn_code,
+                "asn_org": asn_org
             }
     except Exception as e:
         logger.error(f"Error fetching cached ip geo for {h}: {e}")
@@ -85,18 +98,29 @@ async def get_ip_geo_info(ip: str) -> dict:
     # 2. Call external API (concurrency protected by thread pool)
     country, country_code, city, asn = await asyncio.to_thread(_sync_get_ip_geo, h)
     
-    # 3. Store into database cache
+    # 3. Store into database cache (even if failed, we cache it, but subsequent reads will bypass it if it's '未知地区')
     try:
         await db.cache_ip_geo(h, country, country_code, city, asn)
     except Exception as e:
         logger.error(f"Error caching ip geo for {h}: {e}")
         
+    asn_full = asn or ""
+    asn_code = ""
+    asn_org = ""
+    if asn_full:
+        parts = asn_full.split(" ", 1)
+        asn_code = parts[0]
+        if len(parts) > 1:
+            asn_org = parts[1]
+
     return {
         "country": country,
         "country_code": country_code,
         "flag": get_flag_emoji(country_code),
         "city": city,
-        "asn": asn
+        "asn": asn_full,
+        "asn_code": asn_code,
+        "asn_org": asn_org
     }
 
 
