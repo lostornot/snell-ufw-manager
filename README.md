@@ -38,6 +38,8 @@ sudo scripts/install-controller.sh
 
 The installer uses `/opt/snell-ufw-manager-by-gpt` by default, creates `data/` with mode `700`, stores the SQLite database with mode `600`, and generates `SESSION_SECRET` in `.env` when absent.
 
+On startup, the controller creates missing tables and applies lightweight SQLite column migrations for existing databases. Keep a copy of `data/snell-ufw-control.db` before major upgrades.
+
 The controller service runs as the restricted `snell-ufw-control` system user. Put controller-side SSH config and keys under:
 
 ```text
