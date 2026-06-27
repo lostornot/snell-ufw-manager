@@ -1047,21 +1047,20 @@ async def partial_ip_tag_edit(request: Request, ip: str):
     """Return inline edit input form for an IP tag, wrapped with check and cancel buttons."""
     remarks = await db.get_ip_remarks_map()
     current_tag = remarks.get(ip, "")
-    ip_safe = ip.replace(".", "_").replace("/", "_")
     
     html = f"""
     <div class="inline-edit-container" style="display: inline-flex; align-items: center; gap: 4px; vertical-align: middle;">
-        <input type="text" id="inline-tag-input-{ip_safe}" name="tag" value="{current_tag}" 
+        <input type="hidden" name="ip" value="{ip}">
+        <input type="text" name="tag" value="{current_tag}" 
                class="form-input"
                placeholder="标签"
                style="font-size: 0.68rem; height: 22px; width: 70px; padding: 1px 4px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 3px; outline: none; margin: 0;"
-               onkeydown="if(event.key==='Enter') {{ document.getElementById('inline-tag-save-{ip_safe}').click(); }}"
+               onkeydown="if(event.key==='Enter') {{ this.nextElementSibling.click(); }}"
                focus-me>
         <!-- Save Button -->
-        <button id="inline-tag-save-{ip_safe}"
+        <button type="button"
                 hx-put="/api/ip-addresses/inline-edit" 
-                hx-include="#inline-tag-input-{ip_safe}"
-                hx-vals='{{"ip": "{ip}"}}'
+                hx-include="closest .inline-edit-container"
                 hx-target="closest .inline-edit-container" 
                 hx-swap="outerHTML" 
                 class="btn btn-primary" 
@@ -1070,7 +1069,8 @@ async def partial_ip_tag_edit(request: Request, ip: str):
             ✓
         </button>
         <!-- Cancel Button -->
-        <button hx-get="/api/ip-addresses/inline-cancel?ip={ip}&current_tag={current_tag}" 
+        <button type="button"
+                hx-get="/api/ip-addresses/inline-cancel?ip={ip}&current_tag={current_tag}" 
                 hx-target="closest .inline-edit-container" 
                 hx-swap="outerHTML" 
                 class="btn btn-secondary" 
