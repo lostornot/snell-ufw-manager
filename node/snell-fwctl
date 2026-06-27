@@ -373,7 +373,7 @@ cmd_candidates() {
         for (i=1; i<n; i++) {
             max_idx = i
             for (j=i+1; j<=n; j++) {
-                if (counts[j] > counts[max_idx]) max_idx = j
+                if (last[ips[j]] > last[ips[max_idx]]) max_idx = j
             }
             if (max_idx != i) {
                 tmp = ips[i]; ips[i] = ips[max_idx]; ips[max_idx] = tmp
