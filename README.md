@@ -38,6 +38,20 @@ sudo scripts/install-controller.sh
 
 The installer uses `/opt/snell-ufw-manager-by-gpt` by default, creates `data/` with mode `700`, stores the SQLite database with mode `600`, and generates `SESSION_SECRET` in `.env` when absent.
 
+The controller service runs as the restricted `snell-ufw-control` system user. Put controller-side SSH config and keys under:
+
+```text
+/opt/snell-ufw-manager-by-gpt/.ssh
+```
+
+For example:
+
+```bash
+sudo install -d -m 700 -o snell-ufw-control -g snell-ufw-control /opt/snell-ufw-manager-by-gpt/.ssh
+sudo install -m 600 -o snell-ufw-control -g snell-ufw-control ~/.ssh/snell_control_ed25519 /opt/snell-ufw-manager-by-gpt/.ssh/snell_control_ed25519
+sudo install -m 600 -o snell-ufw-control -g snell-ufw-control ~/.ssh/config /opt/snell-ufw-manager-by-gpt/.ssh/config
+```
+
 ## Node Install
 
 ```bash

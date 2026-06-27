@@ -12,10 +12,23 @@ def read(path: str) -> str:
 def test_controller_service_binds_localhost_only() -> None:
     service = read("systemd/snell-ufw-control.service")
 
-    assert "127.0.0.1" in service
-    assert "8898" in service
+    assert "--host ${HOST}" in service
+    assert "--port ${PORT}" in service
     assert "/opt/snell-ufw-manager-by-gpt" in service
     assert "0.0.0.0" not in service
+
+
+def test_controller_service_runs_as_restricted_user_with_hardening() -> None:
+    service = read("systemd/snell-ufw-control.service")
+
+    assert "User=snell-ufw-control" in service
+    assert "Group=snell-ufw-control" in service
+    assert "NoNewPrivileges=true" in service
+    assert "PrivateTmp=true" in service
+    assert "ProtectSystem=strict" in service
+    assert "ProtectHome=true" in service
+    assert "ReadWritePaths=/opt/snell-ufw-manager-by-gpt/data" in service
+    assert "UMask=0077" in service
 
 
 def test_node_installer_uses_single_restricted_nopasswd_entrypoint() -> None:
@@ -58,6 +71,12 @@ def test_controller_installer_generates_secrets_and_protects_data() -> None:
     assert "chmod 600" in script
     assert "127.0.0.1" in script
     assert "/opt/snell-ufw-manager-by-gpt" in script
+    assert "SERVICE_USER=\"${SERVICE_USER:-snell-ufw-control}\"" in script
+    assert "useradd --system" in script
+    assert "\"$APP_DIR/.ssh\"" in script
+    assert "chown -R \"$SERVICE_USER:$SERVICE_USER\" \"$APP_DIR/data\"" in script
+    assert "systemctl enable --now \"$SERVICE_NAME\"" in script
+    assert "systemctl restart \"$SERVICE_NAME\"" in script
 
 
 def test_package_declares_python_310_compatibility() -> None:
@@ -84,6 +103,7 @@ def test_readme_documents_security_model() -> None:
     assert "SSH Tunnel" in readme
     assert "admin token" not in readme.lower()
     assert "ssh_alias" in readme
+    assert "/opt/snell-ufw-manager-by-gpt/.ssh" in readme
     assert "UFW inactive" in readme
     assert "Snell version" in readme
     assert "not a general VPS panel" in readme

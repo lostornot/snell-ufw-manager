@@ -4,11 +4,19 @@ After=network.target
 
 [Service]
 Type=simple
+User=snell-ufw-control
+Group=snell-ufw-control
 WorkingDirectory=/opt/snell-ufw-manager-by-gpt
 EnvironmentFile=/opt/snell-ufw-manager-by-gpt/.env
-ExecStart=/opt/snell-ufw-manager-by-gpt/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8898
+ExecStart=/opt/snell-ufw-manager-by-gpt/.venv/bin/uvicorn app.main:app --host ${HOST} --port ${PORT}
 Restart=on-failure
 RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/snell-ufw-manager-by-gpt/data
 
 [Install]
 WantedBy=multi-user.target
