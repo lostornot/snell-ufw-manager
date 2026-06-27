@@ -233,7 +233,9 @@ cmd_candidates() {
     if [[ -z "$port" ]]; then
         json_err "usage: snell-fwctl candidates <port> [hours]"
     fi
-    validate_port "$port"
+    if [[ "$port" != "all" ]]; then
+        validate_port "$port"
+    fi
     if [[ ! "$hours" =~ ^[0-9]+$ ]] || (( hours < 1 )); then
         json_err "invalid hours: $hours"
     fi
@@ -290,7 +292,8 @@ cmd_candidates() {
                 break
             }
         }
-        if (dpt != port) next
+        if (dpt == "") next
+        if (port != "all" && dpt != port) next
 
         # Extract SRC value
         src=""
@@ -356,36 +359,37 @@ cmd_candidates() {
             ts = sprintf("%d-%02d-%02dT%s", year, mon, day, time_str)
         }
 
-        # Aggregate
-        count[src]++
-        last[src] = ts
-        if (!(src in act)) act[src] = action
-        if (action == "BLOCK") act[src] = "BLOCK"
+        # Aggregate by key: IP + Port
+        key = src "_" dpt
+        count[key]++
+        last[key] = ts
+        key_ip[key] = src
+        key_port[key] = dpt
+        if (!(key in act)) act[key] = action
+        if (action == "BLOCK") act[key] = "BLOCK"
     }
     END {
         n = 0
-        for (ip in count) {
+        for (key in count) {
             n++
-            ips[n] = ip
-            counts[n] = count[ip]
+            keys[n] = key
         }
-        # Simple selection sort
+        # Simple selection sort by time descending
         for (i=1; i<n; i++) {
             max_idx = i
             for (j=i+1; j<=n; j++) {
-                if (last[ips[j]] > last[ips[max_idx]]) max_idx = j
+                if (last[keys[j]] > last[keys[max_idx]]) max_idx = j
             }
             if (max_idx != i) {
-                tmp = ips[i]; ips[i] = ips[max_idx]; ips[max_idx] = tmp
-                tmp = counts[i]; counts[i] = counts[max_idx]; counts[max_idx] = tmp
+                tmp = keys[i]; keys[i] = keys[max_idx]; keys[max_idx] = tmp
             }
         }
         # Output JSON array
         printf "["
         for (i=1; i<=n; i++) {
-            ip = ips[i]
+            k = keys[i]
             if (i > 1) printf ","
-            printf "{\"ip\": \"%s\", \"action\": \"%s\", \"count\": %d, \"last_seen\": \"%s\"}", ip, act[ip], count[ip], last[ip]
+            printf "{\"ip\": \"%s\", \"port\": %s, \"action\": \"%s\", \"count\": %d, \"last_seen\": \"%s\"}", key_ip[k], key_port[k], act[k], count[k], last[k]
         }
         printf "]"
     }
@@ -395,7 +399,7 @@ cmd_candidates() {
     tz_offset=$(date '+%z')
     local tz_name
     tz_name=$(date '+%Z')
-    json_ok "\"port\": ${port}, \"hours\": ${hours}, \"tz_offset\": \"${tz_offset}\", \"tz_name\": \"${tz_name}\", \"candidates\": ${candidates_json}"
+    json_ok "\"port\": \"${port}\", \"hours\": ${hours}, \"tz_offset\": \"${tz_offset}\", \"tz_name\": \"${tz_name}\", \"candidates\": ${candidates_json}"
 }
 
 # ─── Command: sync ───────────────────────────────────────────────────────────

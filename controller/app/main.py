@@ -1421,12 +1421,13 @@ async def partial_setup_script(request: Request):
 # ---------------------------------------------------------------------------
 
 @app.get("/partials/nodes/{node_id}/access-log", response_class=HTMLResponse)
-async def partial_access_log(request: Request, node_id: int, hours: int = 24):
+async def partial_access_log(request: Request, node_id: int, hours: int = 24, port: str = "default"):
     node = await db.get_node(node_id)
     if not node:
         raise HTTPException(status_code=404)
         
-    result = await ssh.get_candidates(node, hours)
+    query_port = str(node["snell_port"]) if port == "default" else port
+    result = await ssh.get_candidates(node, hours, query_port)
     if result.get("ok"):
         tz_offset = result.get("tz_offset", "+0000")
         candidates = result.get("candidates", [])
@@ -1454,6 +1455,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24):
             "result": result,
             "allowed_set": allowed_set,
             "all_tags": all_tags,
+            "current_port": query_port,
         },
     )
 

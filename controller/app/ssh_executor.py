@@ -90,9 +90,10 @@ class SSHExecutor:
         """Delete a single IP/CIDR from the whitelist."""
         return await self.run(node, f"delete {ip_cidr} {node['snell_port']}")
 
-    async def get_candidates(self, node: dict, hours: int = 24) -> dict:
-        """Get recent IPs that accessed/tried to access the Snell port."""
-        return await self.run(node, f"candidates {node['snell_port']} {hours}")
+    async def get_candidates(self, node: dict, hours: int = 24, port: str | None = None) -> dict:
+        """Get recent IPs that accessed/tried to access UFW ports."""
+        query_port = port if port is not None else str(node["snell_port"])
+        return await self.run(node, f"candidates {query_port} {hours}")
 
     async def get_snell_port(self, node: dict) -> dict:
         """Read Snell port from the node's config file."""

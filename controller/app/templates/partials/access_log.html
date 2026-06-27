@@ -1,4 +1,34 @@
-<!-- Access log partial: recent IPs that accessed/tried to access Snell port -->
+<!-- Access log partial: recent IPs that accessed/tried to access Snell/other ports -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; flex-wrap: wrap;">
+  <!-- Port filter select -->
+  <div style="display: inline-flex; align-items: center; gap: 8px;">
+    <span style="font-size: 0.82rem; color: var(--text-secondary);">监听端口:</span>
+    <select name="port" 
+            class="form-select" 
+            style="width: auto; height: 32px; padding: 4px 10px; font-size: 0.82rem;"
+            hx-get="/partials/nodes/{{ node.id }}/access-log"
+            hx-target="#access-log"
+            hx-swap="innerHTML"
+            hx-indicator="#access-log-spinner">
+      <option value="default" {% if current_port == node.snell_port | string %}selected{% endif %}>{{ node.snell_port }} (SNELL 默认)</option>
+      <option value="22" {% if current_port == '22' %}selected{% endif %}>22 (SSH 默认)</option>
+      <option value="all" {% if current_port == 'all' %}selected{% endif %}>全部端口</option>
+    </select>
+  </div>
+  
+  <!-- Spinner & Refresher -->
+  <div style="display: inline-flex; align-items: center; gap: 8px;">
+    <span id="access-log-spinner" class="spinner htmx-indicator" style="margin: 0;"></span>
+    <button class="btn btn-ghost btn-sm"
+            hx-get="/partials/nodes/{{ node.id }}/access-log?port={{ current_port }}"
+            hx-target="#access-log"
+            hx-swap="innerHTML"
+            hx-indicator="#access-log-spinner">
+      刷新日志
+    </button>
+  </div>
+</div>
+
 {% if result and result.ok %}
   {% set candidates = result.candidates | default([]) %}
   {% if candidates %}
@@ -16,10 +46,15 @@
       </thead>
       <tbody>
         {% for c in candidates %}
+        {% set rule_port = c.port | default(node.snell_port) %}
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
           <td class="mono" style="white-space: nowrap;">{{ c.ip }}</td>
-          <td class="mono" style="white-space: nowrap;"><span class="tag tag-info" style="font-size:0.8rem; padding:2px 6px; border-radius:4px;">{{ node.snell_port }}</span></td>
+          <td class="mono" style="white-space: nowrap;">
+            <span class="tag tag-info" style="font-size:0.8rem; padding:2px 6px; border-radius:4px;">
+              {{ rule_port }}
+            </span>
+          </td>
           <td style="white-space: nowrap;">
             {% if c.action == "ALLOW" %}
               <span class="tag tag-allow" style="white-space: nowrap;">✅ 允许</span>
@@ -32,14 +67,14 @@
           <td style="white-space: nowrap;">
             {% if not in_whitelist %}
             <div style="display:inline-flex;align-items:center;gap:12px;white-space: nowrap;">
-              <!-- Action 1: Whitelist directly on this node's Snell port -->
-              <button hx-post="/api/nodes/{{ node.id }}/ports/{{ node.snell_port }}/ips"
+              <!-- Action 1: Whitelist directly on this target port -->
+              <button hx-post="/api/nodes/{{ node.id }}/ports/{{ rule_port }}/ips"
                       hx-vals='{"ip_cidr": "{{ c.ip }}"}'
-                      hx-target="#port-card-{{ node.snell_port }}"
+                      hx-target="#port-card-{{ rule_port }}"
                       hx-swap="outerHTML"
                       class="btn btn-secondary btn-sm"
                       style="white-space: nowrap;height:28px;padding:2px 8px;font-weight:600;font-size:0.75rem;"
-                      title="直接放行此 IP 到当前主机的 Snell 端口 {{ node.snell_port }}">
+                      title="直接放行此 IP 到主机的端口 {{ rule_port }}">
                 直接放行
               </button>
 
@@ -47,8 +82,10 @@
               <span class="text-muted" style="font-size:0.8rem;color:rgba(15,23,42,0.15);">|</span>
 
               <!-- Action 2: Quick-add to IP address registry with tag -->
-              <form style="display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;white-space: nowrap;" hx-post="/api/nodes/{{ node.id }}/quick-add"
-                    hx-target="#toast-container" hx-swap="beforeend">
+              <form style="display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;white-space: nowrap;" 
+                    hx-post="/api/nodes/{{ node.id }}/quick-add"
+                    hx-target="#toast-container" 
+                    hx-swap="beforeend">
                 <input type="hidden" name="ip_cidr" value="{{ c.ip }}">
                 <span class="text-secondary" style="font-size:0.75rem;white-space: nowrap;">标签:</span>
                 <input type="text" name="tag" class="form-input" placeholder="标签(可选)" 
@@ -68,17 +105,17 @@
     </table>
   </div>
   {% else %}
-  <div class="empty-state">
-    <p>该时间段内没有访问记录</p>
+  <div class="empty-state" style="padding: 30px; text-align: center; color: var(--text-muted); font-size: 0.9rem;">
+    <p>该时间段与端口下没有发现拦截访问记录</p>
   </div>
   {% endif %}
 
 {% elif result %}
-  <div class="empty-state" style="color:var(--error);">
+  <div class="empty-state" style="color:var(--error); padding: 30px; text-align: center;">
     <p>❌ 获取失败: {{ result.error }}</p>
   </div>
 {% else %}
-  <div class="empty-state">
+  <div class="empty-state" style="padding: 30px; text-align: center; color: var(--text-muted);">
     <p>加载中...</p>
   </div>
 {% endif %}
