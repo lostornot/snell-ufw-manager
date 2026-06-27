@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 from pathlib import Path
@@ -118,12 +119,14 @@ def test_install_from_custom_binary_writes_binary_config_and_service(tmp_path: P
     service_path = tmp_path / "systemd" / "snell.service"
     backup_dir = tmp_path / "backup"
     source_binary.write_bytes(b"fake snell binary")
+    digest = hashlib.sha256(b"fake snell binary").hexdigest()
 
     process = run_snellctl(
         "install",
         {
             "snell_version": "v5.x",
             "custom_binary_path": str(source_binary),
+            "snell_sha256": digest,
             "install_path": str(install_path),
             "config_path": str(config_path),
             "service_path": str(service_path),
@@ -147,6 +150,30 @@ def test_install_from_custom_binary_writes_binary_config_and_service(tmp_path: P
         ["systemctl", "restart", "snell"],
         ["systemctl", "is-active", "snell"],
     ]
+
+
+def test_install_refuses_custom_binary_with_wrong_sha256(tmp_path: Path) -> None:
+    source_binary = tmp_path / "snell-server-src"
+    install_path = tmp_path / "bin" / "snell-server"
+    source_binary.write_bytes(b"fake snell binary")
+
+    process = run_snellctl(
+        "install",
+        {
+            "snell_version": "v5.x",
+            "custom_binary_path": str(source_binary),
+            "snell_sha256": "0" * 64,
+            "install_path": str(install_path),
+            "config_path": str(tmp_path / "snell.conf"),
+            "service_path": str(tmp_path / "snell.service"),
+            "config_text": "psk = secret\n",
+            "skip_systemctl": True,
+        },
+    )
+
+    assert process.returncode == 2
+    assert body(process)["error"]["code"] == "SNELL_CHECKSUM_MISMATCH"
+    assert not install_path.exists()
 
 
 def test_install_non_dry_run_requires_binary_source(tmp_path: Path) -> None:

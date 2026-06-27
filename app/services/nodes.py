@@ -53,6 +53,7 @@ def update_node_config(
     desired_config_text: str | None,
     psk: str | None,
     snell_version: str | None,
+    snell_sha256: str | None,
 ) -> Node:
     node = db.get(Node, node_id)
     if node is None:
@@ -60,6 +61,7 @@ def update_node_config(
     node.desired_config_text = desired_config_text
     node.psk = psk
     node.snell_version = snell_version
+    node.snell_sha256 = snell_sha256
     db.commit()
     db.refresh(node)
     return node

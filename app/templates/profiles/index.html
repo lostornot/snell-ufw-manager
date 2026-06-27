@@ -15,6 +15,7 @@
   <label>名称 <input name="name" required placeholder="默认 v5"></label>
   <label>Snell 端口 <input name="snell_port" type="number" value="23456" min="1" max="65535" required></label>
   <label>Snell 版本 <input name="snell_version" placeholder="v5.x"></label>
+  <label>Snell SHA256 <input name="snell_sha256" placeholder="64 位校验值"></label>
   <label>PSK <input name="psk" type="password"></label>
   <label class="check"><input name="enable_tcp" type="checkbox" checked> TCP</label>
   <label class="check"><input name="enable_udp" type="checkbox" checked> UDP</label>
@@ -31,12 +32,13 @@
 </div>
 <div class="table-wrap">
 <table>
-  <thead><tr><th>名称</th><th>版本</th><th>端口</th><th>协议</th></tr></thead>
+  <thead><tr><th>名称</th><th>版本</th><th>SHA256</th><th>端口</th><th>协议</th></tr></thead>
   <tbody>
     {% for profile in profiles %}
     <tr>
       <td>{{ profile.name }}</td>
       <td>{{ profile.snell_version or "" }}</td>
+      <td>{{ profile.snell_sha256 or "" }}</td>
       <td>{{ profile.snell_port }}</td>
       <td>{% if profile.enable_tcp %}tcp {% endif %}{% if profile.enable_udp %}udp{% endif %}</td>
     </tr>

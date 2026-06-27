@@ -119,6 +119,8 @@ Snell version is desired state. Do not blindly install latest. V1 supports expli
 
 The controller UI stores desired Snell config per node. Users can start from a default config, paste their own config, reuse PSKs across nodes when intended, and apply the saved config through the restricted node tool.
 
+For production installs, store a 64-character SHA256 digest with the node or profile. When installing from a custom binary path or download URL, the node tool verifies the Snell binary checksum before writing config or restarting the service. A mismatch aborts installation and removes the copied/downloaded binary.
+
 ## UFW Safety
 
 `ufw apply` writes managed allow rules but does not enable UFW. If UFW is inactive, the UI must show:

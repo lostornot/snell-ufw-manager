@@ -39,6 +39,7 @@ def create_node(db: Session) -> Node:
         snell_port=23456,
         snell_version="v5.x",
         snell_arch="amd64",
+        snell_sha256="a" * 64,
         enable_tcp=True,
         enable_udp=True,
         desired_config_text="listen = ::0:23456\npsk = secret\n",
@@ -273,6 +274,7 @@ def test_install_snell_sends_install_payload_and_audits(monkeypatch) -> None:
     assert captured["namespace"] == "snell"
     assert captured["subcommand"] == "install"
     assert captured["payload"]["snell_version"] == "v5.x"
+    assert captured["payload"]["snell_sha256"] == "a" * 64
     assert captured["payload"]["custom_binary_path"] == "/tmp/snell-server"
     assert captured["payload"]["config_text"] == node.desired_config_text
     assert audit.action == "snell.install"

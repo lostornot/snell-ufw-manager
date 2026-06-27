@@ -25,12 +25,24 @@ def valid_node_payload() -> dict[str, object]:
 
 
 def test_valid_node_payload_is_accepted() -> None:
-    node = NodeCreate(**valid_node_payload())
+    payload = valid_node_payload()
+    payload["snell_sha256"] = "a" * 64
+    node = NodeCreate(**payload)
 
     assert node.host == "203.0.113.10"
     assert node.ssh_user == "snellmgr"
     assert node.enable_tcp is True
     assert node.enable_udp is True
+    assert node.snell_sha256 == "a" * 64
+
+
+@pytest.mark.parametrize("value", ["abc", "g" * 64, "a" * 63, "a" * 65])
+def test_snell_sha256_must_be_64_hex_chars(value: str) -> None:
+    payload = valid_node_payload()
+    payload["snell_sha256"] = value
+
+    with pytest.raises(ValidationError):
+        NodeCreate(**payload)
 
 
 @pytest.mark.parametrize("field", ["ssh_port", "snell_port"])
@@ -130,4 +142,3 @@ def test_profile_uses_same_protocol_validation() -> None:
             psk="secret",
             config_text="listen = ::0:23456\npsk = secret\n",
         )
-

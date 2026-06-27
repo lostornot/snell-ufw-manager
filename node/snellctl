@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -64,6 +65,23 @@ def systemctl_commands(payload: dict[str, Any], action: str) -> list[list[str]]:
 
 def run_command(command: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(command, text=True, capture_output=True, timeout=60)
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_sha256(path: Path, expected: str | None) -> tuple[bool, str | None]:
+    if not expected:
+        return True, None
+    actual = sha256_file(path)
+    if actual.lower() != expected.lower():
+        return False, actual
+    return True, actual
 
 
 def write_service_file(service_path: Path, install_path: Path, config_path: Path, service: str) -> None:
@@ -149,6 +167,13 @@ def handle_install(payload: dict[str, Any]) -> int:
         if completed.returncode != 0:
             return fail("SNELL_DOWNLOAD_FAILED", completed.stderr or "download failed")
         os.chmod(install_path, 0o755)
+    checksum_ok, actual_sha256 = verify_sha256(install_path, payload.get("snell_sha256"))
+    if not checksum_ok:
+        install_path.unlink(missing_ok=True)
+        return fail(
+            "SNELL_CHECKSUM_MISMATCH",
+            f"Snell binary SHA256 mismatch: expected {payload.get('snell_sha256')}, got {actual_sha256}",
+        )
 
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_text(str(payload.get("config_text", "")))
@@ -172,6 +197,7 @@ def handle_install(payload: dict[str, Any]) -> int:
             "would_install": True,
             "installed": True,
             "install_path": str(install_path),
+            "snell_sha256": actual_sha256,
             "config_path": str(config_path),
             "service_path": str(service_path),
             "backup_path": str(backup_path) if backup_path else None,

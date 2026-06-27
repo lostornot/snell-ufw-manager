@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 USERNAME_RE = re.compile(r"^[a-z_][a-z0-9_-]{0,31}$")
+SHA256_RE = re.compile(r"^[a-fA-F0-9]{64}$")
 
 
 class StrictSchema(BaseModel):
@@ -37,6 +38,7 @@ class NodeCreate(ProtocolFlags):
     snell_version: str | None = Field(default=None, max_length=64)
     snell_channel: str | None = Field(default=None, max_length=64)
     snell_arch: str | None = Field(default=None, max_length=64)
+    snell_sha256: str | None = Field(default=None, max_length=64)
     remark: str | None = None
     enabled: bool = True
     desired_config_text: str | None = None
@@ -58,6 +60,13 @@ class NodeCreate(ProtocolFlags):
             raise ValueError("ssh_user must be a conservative Linux username")
         return value
 
+    @field_validator("snell_sha256")
+    @classmethod
+    def validate_snell_sha256(cls, value: str | None) -> str | None:
+        if value is not None and not SHA256_RE.fullmatch(value):
+            raise ValueError("snell_sha256 must be a 64 character hex SHA256 digest")
+        return value.lower() if value is not None else None
+
     @model_validator(mode="after")
     def validate_connection_fields(self) -> NodeCreate:
         if self.ssh_alias:
@@ -77,9 +86,17 @@ class SnellConfigProfileCreate(ProtocolFlags):
     snell_version: str | None = Field(default=None, max_length=64)
     snell_channel: str | None = Field(default=None, max_length=64)
     snell_arch: str | None = Field(default=None, max_length=64)
+    snell_sha256: str | None = Field(default=None, max_length=64)
     psk: str | None = Field(default=None, max_length=512)
     config_text: str | None = None
     remark: str | None = None
+
+    @field_validator("snell_sha256")
+    @classmethod
+    def validate_snell_sha256(cls, value: str | None) -> str | None:
+        if value is not None and not SHA256_RE.fullmatch(value):
+            raise ValueError("snell_sha256 must be a 64 character hex SHA256 digest")
+        return value.lower() if value is not None else None
 
 
 class RelayGroupCreate(StrictSchema):

@@ -38,6 +38,7 @@ class Node(TimestampMixin, Base):
     snell_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snell_channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snell_arch: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    snell_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     enable_tcp: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_udp: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     remark: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -71,6 +72,7 @@ class SnellConfigProfile(TimestampMixin, Base):
     snell_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snell_channel: Mapped[str | None] = mapped_column(String(64), nullable=True)
     snell_arch: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    snell_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     enable_tcp: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     enable_udp: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     psk: Mapped[str | None] = mapped_column(String(512), nullable=True)
@@ -182,4 +184,3 @@ class OperationLock(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     node: Mapped[Node] = relationship(back_populates="locks")
-

@@ -156,6 +156,7 @@ def create_app() -> FastAPI:
         ssh_user: str = Form(default="snellmgr"),
         snell_port: int = Form(),
         snell_version: str = Form(default=""),
+        snell_sha256: str = Form(default=""),
         psk: str = Form(default=""),
         enable_tcp: str | None = Form(default=None),
         enable_udp: str | None = Form(default=None),
@@ -171,6 +172,7 @@ def create_app() -> FastAPI:
             ssh_user=ssh_user or None,
             snell_port=snell_port,
             snell_version=snell_version or None,
+            snell_sha256=snell_sha256 or None,
             psk=psk or None,
             enable_tcp=enable_tcp == "on",
             enable_udp=enable_udp == "on",
@@ -252,6 +254,7 @@ def create_app() -> FastAPI:
         ssh_user: str = Form(default="snellmgr"),
         snell_port: int = Form(),
         snell_version: str = Form(default=""),
+        snell_sha256: str = Form(default=""),
         psk: str = Form(default=""),
         enable_tcp: str | None = Form(default=None),
         enable_udp: str | None = Form(default=None),
@@ -270,6 +273,7 @@ def create_app() -> FastAPI:
             ssh_user=ssh_user or None,
             snell_port=snell_port,
             snell_version=snell_version or None,
+            snell_sha256=snell_sha256 or None,
             psk=psk or None,
             enable_tcp=enable_tcp == "on",
             enable_udp=enable_udp == "on",
@@ -297,6 +301,7 @@ def create_app() -> FastAPI:
         desired_config_text: str = Form(default=""),
         psk: str = Form(default=""),
         snell_version: str = Form(default=""),
+        snell_sha256: str = Form(default=""),
         db: Session = Depends(get_session_db),
     ) -> RedirectResponse:
         try:
@@ -306,6 +311,7 @@ def create_app() -> FastAPI:
                 desired_config_text=desired_config_text or None,
                 psk=psk or None,
                 snell_version=snell_version or None,
+                snell_sha256=snell_sha256 or None,
             )
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -320,6 +326,7 @@ def create_app() -> FastAPI:
                 "desired_config_text": desired_config_text or None,
                 "psk": psk or None,
                 "snell_version": snell_version or None,
+                "snell_sha256": snell_sha256 or None,
             },
             result_json={"id": node.id},
             success=True,
@@ -485,6 +492,7 @@ def create_app() -> FastAPI:
         name: str = Form(),
         snell_port: int = Form(),
         snell_version: str = Form(default=""),
+        snell_sha256: str = Form(default=""),
         psk: str = Form(default=""),
         enable_tcp: str | None = Form(default=None),
         enable_udp: str | None = Form(default=None),
@@ -496,6 +504,7 @@ def create_app() -> FastAPI:
             name=name,
             snell_port=snell_port,
             snell_version=snell_version or None,
+            snell_sha256=snell_sha256 or None,
             psk=psk or None,
             enable_tcp=enable_tcp == "on",
             enable_udp=enable_udp == "on",
