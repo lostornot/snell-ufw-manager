@@ -20,31 +20,42 @@
 </head>
 <body hx-headers='{"X-Requested-With": "htmx"}'>
 
-  <!-- Navigation -->
-  <nav class="nav">
-    <div class="nav-brand">
-      <span class="icon">🛡️</span>
-      <span>Firewall Console</span>
-    </div>
-    <ul class="nav-links">
-      <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">📊 仪表盘</a></li>
-      <li><a href="/ip-manage" class="{% if active_page == 'ip_manage' %}active{% endif %}">🏷️ IP 管理</a></li>
-      <li><a href="/nodes/manage" class="{% if active_page == 'nodes_manage' %}active{% endif %}">🖥️ 节点管理</a></li>
-      <li><a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}">📋 操作日志</a></li>
-    </ul>
-    <div class="nav-spacer"></div>
-    <button id="theme-toggle" class="btn btn-ghost btn-sm btn-icon" title="切换主题" style="border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; padding: 0;">
-      🌙
-    </button>
-  </nav>
+  <!-- App Layout Wrapper -->
+  <div class="app-layout">
+    
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="icon">🛡️</span>
+        <span>Firewall Console</span>
+      </div>
+      
+      <ul class="sidebar-links">
+        <li><a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">📊 仪表盘</a></li>
+        <li><a href="/ip-manage" class="{% if active_page == 'ip_manage' %}active{% endif %}">🏷️ IP 管理</a></li>
+        <li><a href="/nodes/manage" class="{% if active_page == 'nodes_manage' %}active{% endif %}">🖥️ 节点管理</a></li>
+        <li><a href="/logs" class="{% if active_page == 'logs' %}active{% endif %}">📋 操作日志</a></li>
+      </ul>
+      
+      <div class="sidebar-footer">
+        <span style="font-size: 0.72rem; color: var(--text-muted); font-weight: 500;">Console v1.2</span>
+        <button id="theme-toggle" class="btn btn-ghost btn-sm btn-icon" title="切换主题" style="border-radius: 50%; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; padding: 0;">
+          🌙
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Container -->
+    <main class="main-content">
+      <div class="container">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+  </div>
 
   <!-- Toast Container -->
   <div class="toast-container" id="toast-container"></div>
-
-  <!-- Main Content -->
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
 
   <!-- Toast Handler -->
   <script>
@@ -73,6 +84,7 @@
     document.body.addEventListener('htmx:afterSettle', function(evt) {
       document.querySelectorAll('.toast-trigger').forEach(el => {
         showToast(el.dataset.message, el.dataset.type || 'success');
+        toastEl = el;
         el.remove();
       });
     });
