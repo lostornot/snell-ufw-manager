@@ -37,6 +37,7 @@
       <thead>
         <tr>
           <th style="white-space: nowrap;">IP</th>
+          <th style="white-space: nowrap;">标签</th>
           <th style="white-space: nowrap;">目标端口</th>
           <th style="white-space: nowrap;">状态</th>
           <th style="white-space: nowrap;">次数</th>
@@ -49,8 +50,8 @@
         {% set rule_port = c.port | default(node.snell_port) %}
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
-          <td class="mono" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 8px; border: none;">
-            <span>{{ c.ip }}</span>
+          <td class="mono" style="white-space: nowrap;">{{ c.ip }}</td>
+          <td>
             {% if c.ip != 'any' and c.ip != 'anywhere' and c.ip != 'Anywhere' %}
             <span class="ip-tag-badge-trigger" 
                   hx-get="/partials/ip-tag-edit?ip={{ c.ip }}" 
@@ -65,6 +66,8 @@
                 <span style="border: 1px dashed rgba(15, 23, 42, 0.15); color: var(--text-muted); padding: 0 3px;">+ 标签</span>
               {% endif %}
             </span>
+            {% else %}
+            <span style="color: var(--text-muted); font-style: italic; font-size: 0.8rem;">—</span>
             {% endif %}
           </td>
           <td class="mono" style="white-space: nowrap;">
