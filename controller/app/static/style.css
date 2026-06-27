@@ -703,72 +703,84 @@ html.dark .tag-default {
   transition: var(--transition-smooth);
   font-family: var(--font-sans);
   box-sizing: border-box;
+  color: var(--text-primary);
+  text-decoration: none !important;
+}
+.btn:hover, .btn:focus {
+  text-decoration: none !important;
 }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-blue) 100%);
-  color: #fff;
+  color: #fff !important;
   box-shadow: 0 4px 15px rgba(124, 58, 237, 0.15);
 }
 .btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 20px rgba(124, 58, 237, 0.25);
+  color: #fff !important;
 }
 html.dark .btn-primary {
   color: #0c0a0f !important;
   font-weight: 700;
 }
+html.dark .btn-primary:hover {
+  color: #0c0a0f !important;
+}
 
 .btn-secondary {
   background: #f8fafc;
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
   border: 1px solid rgba(15, 23, 42, 0.12);
 }
 .btn-secondary:hover {
   background: rgba(124, 58, 237, 0.04);
   border-color: var(--accent-purple);
+  color: var(--accent-purple) !important;
 }
 html.dark .btn-secondary {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
 }
 html.dark .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.08);
   border-color: var(--accent-purple);
+  color: var(--accent-purple) !important;
 }
 
 .btn-danger {
   background: rgba(220, 38, 38, 0.06);
-  color: var(--accent-red);
+  color: var(--accent-red) !important;
   border: 1px solid rgba(220, 38, 38, 0.15);
 }
 .btn-danger:hover {
   background: var(--accent-red);
-  color: #fff;
+  color: #fff !important;
 }
 html.dark .btn-danger {
   background: rgba(239, 68, 68, 0.08);
   border-color: rgba(239, 68, 68, 0.25);
-  color: #f87171;
+  color: #f87171 !important;
 }
 html.dark .btn-danger:hover {
   background: #ef4444;
-  color: #fff;
+  color: #fff !important;
 }
 
 .btn-ghost {
   background: transparent;
   border: 1px solid var(--border-glass);
-  color: var(--text-secondary);
+  color: var(--text-secondary) !important;
 }
 .btn-ghost:hover {
   background: rgba(124, 58, 237, 0.04);
-  color: var(--text-primary);
+  color: var(--text-primary) !important;
   border-color: var(--accent-purple);
 }
 html.dark .btn-ghost:hover {
   background: rgba(167, 139, 250, 0.1);
+  color: var(--text-primary) !important;
 }
 
 .btn-accent-tint {
