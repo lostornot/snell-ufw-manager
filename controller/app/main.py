@@ -963,26 +963,27 @@ async def partial_ip_tag_edit(request: Request, ip: str):
     current_tag = remarks.get(ip, "")
     
     html = f"""
-    <form hx-put="/api/ip-addresses/inline-edit" hx-target="this" hx-swap="outerHTML" style="display:inline-flex; margin:0; padding:0; align-items:center;">
-        <input type="hidden" name="ip" value="{ip}">
-        <input type="text" name="tag" value="{current_tag}" 
-               class="form-input"
-               placeholder="输入标签..."
-               style="font-size: 0.68rem; height: 18px; width: 80px; padding: 1px 4px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 3px; outline: none; margin: 0;"
-               onblur="this.form.requestSubmit()"
-               focus-me>
-        <script>
-            // Auto focus the input when appended to DOM
-            setTimeout(function() {{
-                var inputs = document.querySelectorAll('input[focus-me]');
-                if(inputs.length > 0) {{
-                    var lastInput = inputs[inputs.length - 1];
-                    lastInput.focus();
-                    lastInput.removeAttribute('focus-me');
-                }}
-            }}, 50);
-        </script>
-    </form>
+    <input type="text" name="tag" value="{current_tag}" 
+           hx-put="/api/ip-addresses/inline-edit"
+           hx-vals='{{"ip": "{ip}"}}'
+           hx-trigger="blur"
+           hx-target="this"
+           hx-swap="outerHTML"
+           class="form-input"
+           placeholder="输入标签..."
+           style="font-size: 0.68rem; height: 18px; width: 80px; padding: 1px 4px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 3px; outline: none; margin: 0;"
+           onkeydown="if(event.key==='Enter') {{ this.blur(); }}"
+           focus-me>
+    <script>
+        setTimeout(function() {{
+            var inputs = document.querySelectorAll('input[focus-me]');
+            if(inputs.length > 0) {{
+                var lastInput = inputs[inputs.length - 1];
+                lastInput.focus();
+                lastInput.removeAttribute('focus-me');
+            }}
+        }}, 50);
+    </script>
     """
     return html
 

@@ -83,35 +83,16 @@
           <td class="text-secondary text-sm" style="white-space: nowrap;">{{ c.last_seen }}</td>
           <td style="white-space: nowrap;">
             {% if not in_whitelist %}
-            <div style="display:inline-flex;align-items:center;gap:12px;white-space: nowrap;">
-              <!-- Action 1: Whitelist directly on this target port -->
-              <button hx-post="/api/nodes/{{ node.id }}/ports/{{ rule_port }}/ips"
-                      hx-vals='{"ip_cidr": "{{ c.ip }}"}'
-                      hx-target="#port-card-{{ rule_port }}"
-                      hx-swap="outerHTML"
-                      class="btn btn-secondary btn-sm"
-                      style="white-space: nowrap;height:28px;padding:2px 8px;font-weight:600;font-size:0.75rem;"
-                      title="直接放行此 IP 到主机的端口 {{ rule_port }}">
-                直接放行
-              </button>
-
-              <!-- Divider -->
-              <span class="text-muted" style="font-size:0.8rem;color:rgba(15,23,42,0.15);">|</span>
-
-              <!-- Action 2: Quick-add to IP address registry with tag -->
-              <form style="display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;white-space: nowrap;" 
-                    hx-post="/api/nodes/{{ node.id }}/quick-add"
-                    hx-target="#toast-container" 
-                    hx-swap="beforeend">
-                <input type="hidden" name="ip_cidr" value="{{ c.ip }}">
-                <span class="text-secondary" style="font-size:0.75rem;white-space: nowrap;">标签:</span>
-                <input type="text" name="tag" class="form-input" placeholder="标签(可选)" 
-                       style="width:90px;height:28px;padding:3px 8px;font-size:0.8rem;border:1px solid rgba(15,23,42,0.15);border-radius:4px;">
-                <button type="submit" class="btn btn-success btn-sm" style="white-space: nowrap;height:28px;padding:2px 8px;" title="将该 IP 注册到 IP 地址管理">
-                  注册
-                </button>
-              </form>
-            </div>
+            <!-- Action 1: Whitelist directly on this target port -->
+            <button hx-post="/api/nodes/{{ node.id }}/ports/{{ rule_port }}/ips"
+                    hx-vals='{"ip_cidr": "{{ c.ip }}"}'
+                    hx-target="#port-card-{{ rule_port }}"
+                    hx-swap="outerHTML"
+                    class="btn btn-secondary btn-sm"
+                    style="white-space: nowrap;height:28px;padding:2px 8px;font-weight:600;font-size:0.75rem;"
+                    title="直接放行此 IP 到主机的端口 {{ rule_port }}">
+              直接放行
+            </button>
             {% else %}
             <span class="text-secondary text-sm" style="white-space: nowrap;">已在白名单</span>
             {% endif %}
