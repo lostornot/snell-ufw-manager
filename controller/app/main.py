@@ -1266,6 +1266,15 @@ echo "════════════════════════�
 echo " VPS UFW Firewall Manager — 节点初始化"
 echo "══════════════════════════════════════════"
 
+# 0. Configure Timezone
+echo -n "  设置系统时区为台湾时间 (Asia/Taipei)... "
+if command -v timedatectl &>/dev/null; then
+    timedatectl set-timezone Asia/Taipei || true
+else
+    ln -sf /usr/share/zoneinfo/Asia/Taipei /etc/localtime || true
+fi
+echo "完成 ✓"
+
 # 1. Create snellmgr user
 echo -n "  创建 snellmgr 用户... "
 if id snellmgr &>/dev/null; then

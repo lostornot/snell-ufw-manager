@@ -129,6 +129,24 @@ if [[ -n "$FROM_IP" ]]; then
 echo -e "  From IP:    ${CYAN}${FROM_IP}${NC}"
 fi
 
+# ─── Configure timezone ──────────────────────────────────────────────────────
+
+section "Set timezone to Asia/Taipei"
+step_info "Changing system timezone to Asia/Taipei (Taiwan time)..."
+if command -v timedatectl &>/dev/null; then
+    if timedatectl set-timezone Asia/Taipei; then
+        step_ok "Timezone set to Asia/Taipei via timedatectl"
+    else
+        step_fail "Failed to set timezone via timedatectl"
+    fi
+else
+    if ln -sf /usr/share/zoneinfo/Asia/Taipei /etc/localtime; then
+        step_ok "Timezone set to Asia/Taipei via symlink"
+    else
+        step_fail "Failed to set timezone symlink"
+    fi
+fi
+
 # ─── Step 1: Create snellmgr user ───────────────────────────────────────────
 
 section "1/7  Create snellmgr user"
