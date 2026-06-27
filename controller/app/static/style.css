@@ -135,18 +135,24 @@ h1, h2, h3, h4, .font-outfit {
    ================================================================ */
 
 .nav {
-  position: sticky;
+  position: fixed;
+  left: 0;
   top: 0;
-  z-index: 100;
+  bottom: 0;
+  width: 240px;
+  z-index: 1000;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 0 32px;
-  height: 64px;
-  background: rgba(255, 255, 255, 0.8);
-  border-bottom: 1px solid var(--border-glass);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 24px;
+  padding: 24px 16px;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  height: 100vh;
+  box-sizing: border-box;
+  transition: var(--transition-smooth);
 }
 
 .nav-brand {
@@ -157,11 +163,12 @@ h1, h2, h3, h4, .font-outfit {
   font-weight: 800;
   font-size: 1.25rem;
   color: var(--text-primary);
-  margin-right: 32px;
+  margin-bottom: 8px;
 }
 
 .nav-links {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   list-style: none;
 }
@@ -169,8 +176,8 @@ h1, h2, h3, h4, .font-outfit {
 .nav-links a {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
+  gap: 8px;
+  padding: 10px 16px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 0.92rem;
@@ -179,14 +186,8 @@ h1, h2, h3, h4, .font-outfit {
 }
 
 .nav-links a:hover, .nav-links a.active {
-  background: rgba(15, 23, 42, 0.04);
-  color: var(--text-primary);
-}
-
-.nav-links a.active {
-  font-weight: 600;
-  border-left: 2px solid var(--accent-purple);
-  border-radius: 2px var(--radius-sm) var(--radius-sm) 2px;
+  background: rgba(124, 58, 237, 0.08);
+  color: var(--accent-purple);
 }
 
 .nav-spacer {
@@ -199,8 +200,9 @@ h1, h2, h3, h4, .font-outfit {
 
 .container {
   max-width: 1200px;
-  margin: 0 auto;
+  margin: 0 auto 0 260px;
   padding: 32px 24px;
+  box-sizing: border-box;
 }
 
 .page-header {
@@ -1033,8 +1035,34 @@ tbody tr:hover {
   right: 12px;
 }
 
-/* Responsive Stacking for Horizontal Port Cards */
+/* Responsive Stacking for Horizontal Port Cards & Sidebar Collapse */
 @media (max-width: 992px) {
+  .nav {
+    position: sticky;
+    left: auto;
+    top: 0;
+    bottom: auto;
+    width: 100%;
+    height: 64px;
+    flex-direction: row;
+    align-items: center;
+    padding: 0 24px;
+    border-right: none;
+    border-bottom: 1px solid var(--border-glass);
+    background: var(--bg-secondary);
+  }
+  .nav-brand {
+    margin-bottom: 0;
+    margin-right: 16px;
+  }
+  .nav-links {
+    flex-direction: row;
+    gap: 4px;
+  }
+  .container {
+    margin: 0 auto;
+    width: 100%;
+  }
   .node-detail-layout {
     grid-template-columns: 1fr;
   }
