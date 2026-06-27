@@ -184,6 +184,16 @@ h1, h2, h3, h4, .font-outfit {
   color: var(--accent-purple);
 }
 
+html.dark .nav {
+  background: var(--bg-secondary) !important;
+  border-bottom: 1px solid var(--border-glass);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .nav-links a:hover, html.dark .nav-links a.active {
+  background: rgba(167, 139, 250, 0.12);
+}
+
 .nav-spacer {
   flex: 1;
 }
