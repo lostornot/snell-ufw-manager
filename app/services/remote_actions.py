@@ -5,6 +5,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session, selectinload
 
+from app.locks import acquire_operation_lock, release_operation_lock
 from app.models import Node
 from app.schemas import NodeCreate
 from app.services.audit import write_audit
@@ -97,6 +98,35 @@ def _audit_remote(
     )
 
 
+def _locked_remote_call(
+    db: Session,
+    *,
+    action: str,
+    operation_type: str,
+    node: Node,
+    request_json: dict[str, Any],
+    namespace: str,
+    subcommand: str,
+) -> dict[str, Any]:
+    if not acquire_operation_lock(db, node_id=node.id, operation_type=operation_type, owner="controller"):
+        result = {
+            "ok": False,
+            "data": {},
+            "error": {
+                "code": "NODE_OPERATION_LOCKED",
+                "message": "another write operation is already running for this node",
+            },
+        }
+        _audit_remote(db, action=action, node=node, request_json=request_json, result=result)
+        return result
+    try:
+        result = _result_body(run_remote_command(_node_payload(node), namespace, subcommand, request_json))
+        _audit_remote(db, action=action, node=node, request_json=request_json, result=result)
+        return result
+    finally:
+        release_operation_lock(db, node_id=node.id)
+
+
 def refresh_node_status(db: Session, node_id: int) -> dict[str, Any]:
     node = _get_node(db, node_id)
     payload = {"dry_run": False}
@@ -138,9 +168,15 @@ def apply_ufw_policy(db: Session, node_id: int) -> dict[str, Any]:
     for policy in node.policies:
         _ = policy.relay_group.relay_ips
     payload = build_ufw_apply_payload(node)
-    result = _result_body(run_remote_command(_node_payload(node), "ufw", "apply", payload))
-    _audit_remote(db, action="ufw.apply", node=node, request_json=payload, result=result)
-    return result
+    return _locked_remote_call(
+        db,
+        action="ufw.apply",
+        operation_type="ufw apply",
+        node=node,
+        request_json=payload,
+        namespace="ufw",
+        subcommand="apply",
+    )
 
 
 def apply_snell_config(db: Session, node_id: int) -> dict[str, Any]:
@@ -155,9 +191,15 @@ def apply_snell_config(db: Session, node_id: int) -> dict[str, Any]:
         "psk": node.psk,
         "config_text": node.desired_config_text,
     }
-    result = _result_body(run_remote_command(_node_payload(node), "snell", "config-apply", payload))
-    _audit_remote(db, action="snell.config_apply", node=node, request_json=payload, result=result)
-    return result
+    return _locked_remote_call(
+        db,
+        action="snell.config_apply",
+        operation_type="snell config-apply",
+        node=node,
+        request_json=payload,
+        namespace="snell",
+        subcommand="config-apply",
+    )
 
 
 def install_snell(
@@ -180,9 +222,15 @@ def install_snell(
         "custom_binary_path": custom_binary_path,
         "snell_download_url": snell_download_url,
     }
-    result = _result_body(run_remote_command(_node_payload(node), "snell", "install", payload))
-    _audit_remote(db, action="snell.install", node=node, request_json=payload, result=result)
-    return result
+    return _locked_remote_call(
+        db,
+        action="snell.install",
+        operation_type="snell install",
+        node=node,
+        request_json=payload,
+        namespace="snell",
+        subcommand="install",
+    )
 
 
 def run_snell_service_action(db: Session, node_id: int, action: str) -> dict[str, Any]:
@@ -190,9 +238,15 @@ def run_snell_service_action(db: Session, node_id: int, action: str) -> dict[str
         raise ValueError(f"unsupported service action: {action}")
     node = _get_node(db, node_id)
     payload = {"service_name": "snell"}
-    result = _result_body(run_remote_command(_node_payload(node), "snell", action, payload))
-    _audit_remote(db, action=f"snell.{action}", node=node, request_json=payload, result=result)
-    return result
+    return _locked_remote_call(
+        db,
+        action=f"snell.{action}",
+        operation_type=f"snell {action}",
+        node=node,
+        request_json=payload,
+        namespace="snell",
+        subcommand=action,
+    )
 
 
 def get_snell_config(db: Session, node_id: int) -> dict[str, Any]:
@@ -214,9 +268,15 @@ def read_snell_logs(db: Session, node_id: int, *, lines: int = 100) -> dict[str,
 def restore_snell_config(db: Session, node_id: int, backup_path: str) -> dict[str, Any]:
     node = _get_node(db, node_id)
     payload = {"backup_path": backup_path}
-    result = _result_body(run_remote_command(_node_payload(node), "snell", "restore", payload))
-    _audit_remote(db, action="snell.restore", node=node, request_json=payload, result=result)
-    return result
+    return _locked_remote_call(
+        db,
+        action="snell.restore",
+        operation_type="snell restore",
+        node=node,
+        request_json=payload,
+        namespace="snell",
+        subcommand="restore",
+    )
 
 
 def refresh_access_candidates(db: Session, node_id: int) -> dict[str, Any]:

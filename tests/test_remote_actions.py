@@ -4,7 +4,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.db import Base
-from app.models import AuditLog, Node, RelayGroup, RelayIP, NodePolicy
+from app.locks import acquire_operation_lock
+from app.models import AuditLog, Node, RelayGroup, RelayIP, NodePolicy, OperationLock
 from app.services import remote_actions
 from app.services.remote_actions import (
     check_node_environment,
@@ -154,6 +155,27 @@ def test_apply_ufw_policy_uses_policy_payload(monkeypatch) -> None:
     assert captured["payload"]["rules"][0]["source"] == "198.51.100.8"
     assert captured["payload"]["rules"][0]["comment"] == "snell-control:node:1:group:1:port:23456:proto:tcp"
     assert db.query(AuditLog).one().action == "ufw.apply"
+    assert db.get(OperationLock, node.id) is None
+
+
+def test_write_operation_conflict_is_audited_without_remote_call(monkeypatch) -> None:
+    db = session()
+    node = create_node(db)
+    assert acquire_operation_lock(db, node_id=node.id, operation_type="ufw apply", owner="other") is True
+
+    def fake_run(node_payload, namespace, subcommand, payload):
+        raise AssertionError("remote command should not run while node is locked")
+
+    monkeypatch.setattr(remote_actions, "run_remote_command", fake_run)
+
+    result = apply_ufw_policy(db, node.id)
+
+    audit = db.query(AuditLog).one()
+    assert result["ok"] is False
+    assert result["error"]["code"] == "NODE_OPERATION_LOCKED"
+    assert audit.action == "ufw.apply"
+    assert audit.success is False
+    assert db.get(OperationLock, node.id) is not None
 
 
 def test_apply_snell_config_sends_redacted_audit_payload(monkeypatch) -> None:
