@@ -1426,7 +1426,30 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
     if not node:
         raise HTTPException(status_code=404)
         
-    query_port = str(node["snell_port"]) if port == "default" else port
+    # Fetch live whitelist to see allowed IPs and extract all allowed ports
+    wl_result = await ssh.get_whitelist(node)
+    allowed_set = set()
+    open_ports = set()
+    if wl_result.get("ok"):
+        for r in wl_result.get("rules", []):
+            if str(r.get("port")) == str(node["snell_port"]):
+                allowed_set.add(r.get("ip"))
+            p_val = r.get("port")
+            if p_val:
+                open_ports.add(str(p_val))
+                
+    # Fallback to SNELL and SSH ports if no whitelist could be loaded
+    if not open_ports:
+        open_ports.add(str(node["snell_port"]))
+        open_ports.add("22")
+        
+    if port == "default":
+        query_port = str(node["snell_port"])
+    elif port == "all":
+        query_port = ",".join(open_ports)
+    else:
+        query_port = port
+        
     result = await ssh.get_candidates(node, hours, query_port)
     if result.get("ok"):
         tz_offset = result.get("tz_offset", "+0000")
@@ -1437,14 +1460,6 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
                 c["last_seen"] = convert_to_taiwan_time(orig_seen, tz_offset)
         # Sort candidates by last_seen descending (newest first)
         candidates.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
-    
-    # Fetch live whitelist to see what IPs are already allowed on the node's snell port
-    wl_result = await ssh.get_whitelist(node)
-    allowed_set = set()
-    if wl_result.get("ok"):
-        for r in wl_result.get("rules", []):
-            if str(r.get("port")) == str(node["snell_port"]):
-                allowed_set.add(r.get("ip"))
 
     all_tags = await db.get_all_tags()
     return templates.TemplateResponse(
@@ -1455,7 +1470,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
             "result": result,
             "allowed_set": allowed_set,
             "all_tags": all_tags,
-            "current_port": query_port,
+            "current_port": port,
         },
     )
 

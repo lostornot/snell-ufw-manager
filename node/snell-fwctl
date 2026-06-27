@@ -234,7 +234,11 @@ cmd_candidates() {
         json_err "usage: snell-fwctl candidates <port> [hours]"
     fi
     if [[ "$port" != "all" ]]; then
-        validate_port "$port"
+        # Handle comma-separated list of ports
+        IFS=',' read -r -a ports_arr <<< "$port"
+        for p in "${ports_arr[@]}"; do
+            validate_port "$p"
+        done
     fi
     if [[ ! "$hours" =~ ^[0-9]+$ ]] || (( hours < 1 )); then
         json_err "invalid hours: $hours"
@@ -281,6 +285,10 @@ cmd_candidates() {
         m["Jan"]=1; m["Feb"]=2; m["Mar"]=3; m["Apr"]=4;
         m["May"]=5; m["Jun"]=6; m["Jul"]=7; m["Aug"]=8;
         m["Sep"]=9; m["Oct"]=10; m["Nov"]=11; m["Dec"]=12;
+
+        # Split ports into a lookup array
+        split(port, temp_arr, ",")
+        for (k in temp_arr) open_ports[temp_arr[k]] = 1
     }
     /DPT=/ {
         # Extract DPT value
