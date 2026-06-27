@@ -983,7 +983,7 @@ async def partial_ip_tag_edit(request: Request, ip: str):
         }}, 50);
     </script>
     """
-    return html
+    return HTMLResponse(content=html, headers={"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0"})
 
 
 @app.put("/api/ip-addresses/inline-edit", response_class=HTMLResponse)
@@ -1543,7 +1543,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
 
     all_tags = await db.get_all_tags()
     ip_remarks = await db.get_ip_remarks_map()
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         "partials/access_log.html",
         {
             "request": request,
@@ -1555,6 +1555,8 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
             "ip_remarks": ip_remarks,
         },
     )
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
 
 
 @app.post("/api/nodes/{node_id}/quick-add", response_class=HTMLResponse)
