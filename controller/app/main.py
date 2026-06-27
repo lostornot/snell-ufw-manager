@@ -988,19 +988,43 @@ async def partial_ip_tag_edit(request: Request, ip: str):
 
 @app.put("/api/ip-addresses/inline-edit", response_class=HTMLResponse)
 async def api_ip_inline_edit(request: Request, ip: str = Form(...), tag: str = Form("")):
-    """Update IP tag inline and trigger list refreshes."""
+    """Update IP tag inline and trigger list refreshes with toast feedback."""
     ip = ip.strip()
     tag = tag.strip()
-    if ip and ip not in ("any", "anywhere", "all"):
-        await db.upsert_ip_address(ip, tag, "manual")
-        
+    
+    success = True
+    error_msg = ""
+    try:
+        if ip and ip not in ("any", "anywhere", "all"):
+            await db.upsert_ip_address(ip, tag, "manual")
+    except Exception as exc:
+        success = False
+        error_msg = str(exc)
+
+    if not success:
+        resp_html = f"""
+        <div class="toast-trigger hidden" data-message="❌ 标签更新失败: {error_msg}" data-type="error"></div>
+        <span class="ip-tag-badge-trigger" 
+              hx-get="/partials/ip-tag-edit?ip={ip}" 
+              hx-trigger="click" 
+              hx-target="this" 
+              hx-swap="outerHTML"
+              style="cursor: pointer; font-size: 0.68rem; padding: 1px 5px; border-radius: 3px; white-space: nowrap; background: rgba(239, 68, 68, 0.1); color: var(--error); display: inline-flex; align-items: center; gap: 4px;"
+              title="点击编辑标签">
+            标签失败
+        </span>
+        """
+        return HTMLResponse(content=resp_html)
+
     resp_html = f"""
+    <div class="toast-trigger hidden" data-message="✅ 标签已更新" data-type="success"></div>
     <span class="ip-tag-badge-trigger" 
           hx-get="/partials/ip-tag-edit?ip={ip}" 
           hx-trigger="click" 
           hx-target="this" 
           hx-swap="outerHTML"
-          style="cursor: pointer; font-size: 0.68rem; padding: 1px 5px; border-radius: 3px; white-space: nowrap; background: rgba(139, 92, 246, 0.06); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px;">
+          style="cursor: pointer; font-size: 0.68rem; padding: 1px 5px; border-radius: 3px; white-space: nowrap; background: rgba(139, 92, 246, 0.06); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px;"
+          title="点击编辑标签">
     """
     if tag:
         resp_html += f"{tag}</span>"
@@ -1008,7 +1032,6 @@ async def api_ip_inline_edit(request: Request, ip: str = Form(...), tag: str = F
         resp_html += """<span style="border: 1px dashed rgba(15, 23, 42, 0.15); color: var(--text-muted); padding: 0 3px;">+ 标签</span></span>"""
         
     resp = HTMLResponse(content=resp_html)
-    # Set HX-Trigger to refresh all other IP lists on the page
     resp.headers["HX-Trigger"] = "rules-updated"
     return resp
 
