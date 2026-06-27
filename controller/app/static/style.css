@@ -486,7 +486,7 @@ html.dark .tag-default {
 .btn-close-port {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 1.1rem;
   cursor: pointer;
   width: 28px;
@@ -559,7 +559,7 @@ html.dark .tag-default {
 .btn-remove-ip {
   background: transparent;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
   display: inline-flex;
@@ -716,13 +716,16 @@ html.dark .tag-default {
 }
 
 .btn-secondary {
-  background: #ffffff;
+  background: var(--bg-secondary);
   color: var(--text-primary);
-  border: 1px solid rgba(15, 23, 42, 0.12);
+  border: 1px solid var(--border-glass);
 }
 .btn-secondary:hover {
-  background: rgba(15, 23, 42, 0.04);
-  border-color: rgba(15, 23, 42, 0.25);
+  background: rgba(124, 58, 237, 0.04);
+  border-color: var(--accent-purple);
+}
+html.dark .btn-secondary:hover {
+  background: rgba(167, 139, 250, 0.1);
 }
 
 .btn-danger {
@@ -737,13 +740,31 @@ html.dark .tag-default {
 
 .btn-ghost {
   background: transparent;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--border-glass);
   color: var(--text-secondary);
 }
 .btn-ghost:hover {
-  background: rgba(15, 23, 42, 0.04);
+  background: rgba(124, 58, 237, 0.04);
   color: var(--text-primary);
-  border-color: rgba(15, 23, 42, 0.2);
+  border-color: var(--accent-purple);
+}
+html.dark .btn-ghost:hover {
+  background: rgba(167, 139, 250, 0.1);
+}
+
+.btn-accent-tint {
+  background: rgba(124, 58, 237, 0.06);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  color: var(--accent-purple);
+}
+.btn-accent-tint:hover {
+  background: rgba(124, 58, 237, 0.12);
+  border-color: var(--accent-purple);
+}
+html.dark .btn-accent-tint {
+  background: rgba(167, 139, 250, 0.1);
+  border-color: rgba(167, 139, 250, 0.25);
+  color: var(--accent-purple);
 }
 
 .btn-sm {
