@@ -37,7 +37,6 @@
       <thead>
         <tr>
           <th style="white-space: nowrap;">IP</th>
-          <th style="white-space: nowrap; text-align: center;">国旗</th>
           <th style="white-space: nowrap;">归属国家 / 地区</th>
           <th style="white-space: nowrap;">城市</th>
           <th style="white-space: nowrap;">ASN 编码</th>
@@ -58,17 +57,18 @@
           <!-- 1. IP -->
           <td class="mono" style="white-space: nowrap; font-weight: 600; vertical-align: middle; padding: 10px 12px;">{{ c.ip }}</td>
           
-          <!-- 2. Flag -->
-          <td style="white-space: nowrap; text-align: center; font-size: 1.15rem; vertical-align: middle; padding: 10px 12px;">
-            {% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].flag }}{% else %}🌐{% endif %}
-          </td>
-          
-          <!-- 3. Country -->
+          <!-- 2. Country (with inline Flag) -->
           <td style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">
-            {% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].country }}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+            {% if ip_geos is defined and c.ip in ip_geos %}
+              <span style="font-size: 1.15rem; margin-right: 6px; vertical-align: middle;">{{ ip_geos[c.ip].flag }}</span>
+              <span style="vertical-align: middle;">{{ ip_geos[c.ip].country }}</span>
+            {% else %}
+              <span style="font-size: 1.15rem; margin-right: 6px; vertical-align: middle;">🌐</span>
+              <span style="color: var(--text-muted); vertical-align: middle;">—</span>
+            {% endif %}
           </td>
           
-          <!-- 4. City -->
+          <!-- 3. City -->
           <td style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">
             {% if ip_geos is defined and c.ip in ip_geos and ip_geos[c.ip].city %}{{ ip_geos[c.ip].city }}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
           </td>
