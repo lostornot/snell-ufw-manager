@@ -1420,10 +1420,13 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24):
     result = await ssh.get_candidates(node, hours)
     if result.get("ok"):
         tz_offset = result.get("tz_offset", "+0000")
-        for c in result.get("candidates", []):
+        candidates = result.get("candidates", [])
+        for c in candidates:
             orig_seen = c.get("last_seen", "")
             if orig_seen:
                 c["last_seen"] = convert_to_taiwan_time(orig_seen, tz_offset)
+        # Sort candidates by last_seen descending (newest first)
+        candidates.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
     
     # Fetch live whitelist to see what IPs are already allowed on the node's snell port
     wl_result = await ssh.get_whitelist(node)
