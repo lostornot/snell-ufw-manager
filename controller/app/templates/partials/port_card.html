@@ -35,6 +35,9 @@
               {{ rule.ip }}
             {% endif %}
           </span>
+          {% if ip_remarks is defined and rule.ip in ip_remarks %}
+          <span class="ip-tag-label" style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500; background: rgba(139, 92, 246, 0.08); padding: 1px 5px; border-radius: 3px; white-space: nowrap;">{{ ip_remarks[rule.ip] }}</span>
+          {% endif %}
           <span class="ip-proto" style="font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">{{ rule.proto }}</span>
           <button class="btn-remove-ip"
                   hx-delete="/api/nodes/{{ node.id }}/ports/{{ data.port }}/rules/{{ rule.num }}"
@@ -57,13 +60,18 @@
           hx-target="#port-card-{{ data.port }}"
           hx-swap="outerHTML"
           class="form-quick-add"
-          style="display: flex; gap: 8px; margin: 0; width: 190px; flex-shrink: 0;">
+          style="display: flex; gap: 6px; margin: 0; width: 280px; flex-shrink: 0;">
       <input type="text" 
              name="ip_cidr" 
              class="form-input mono" 
-             placeholder="IP/CIDR 或 IP分组名" 
+             placeholder="IP/CIDR" 
              required
-             style="font-size: 0.82rem; padding: 6px 10px; height: 32px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); flex-grow: 1;">
+             style="font-size: 0.82rem; padding: 6px 8px; height: 32px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); flex: 1 1 110px; min-width: 0;">
+      <input type="text" 
+             name="remark" 
+             class="form-input" 
+             placeholder="标签" 
+             style="font-size: 0.82rem; padding: 6px 8px; height: 32px; background: #ffffff; border: 1px solid rgba(15, 23, 42, 0.12); border-radius: var(--radius-sm); color: var(--text-primary); flex: 0 1 80px; min-width: 0;">
       <button type="submit" class="btn btn-secondary btn-sm" style="padding: 6px 10px; font-weight: 600; font-size: 0.8rem; height: 32px; white-space: nowrap; flex-shrink: 0;">放行</button>
     </form>
 

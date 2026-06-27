@@ -1,0 +1,80 @@
+{% if toast %}
+<div class="toast-trigger hidden" data-message="{{ toast.message }}" data-type="{{ toast.type | default('success') }}"></div>
+{% endif %}
+
+<div id="ip-address-list">
+{% if ip_addresses %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>IP / CIDR</th>
+        <th>标签</th>
+        <th>来源</th>
+        <th>添加时间</th>
+        <th style="width: 140px; text-align: right;">操作</th>
+      </tr>
+    </thead>
+    <tbody id="ip-table-body">
+      {% for ip in ip_addresses %}
+      <tr data-ip="{{ ip.ip_cidr }}" data-tag="{{ ip.tag }}" id="ip-row-{{ ip.id }}">
+        <td class="mono" style="font-size: 0.9rem; color: var(--text-primary); font-weight: 600;">{{ ip.ip_cidr }}</td>
+        <td>
+          <span class="ip-tag-display" id="tag-display-{{ ip.id }}">
+            {% if ip.tag %}
+              <span class="tag tag-info" style="font-size: 0.8rem;">{{ ip.tag }}</span>
+            {% else %}
+              <span style="color: var(--text-muted); font-style: italic; font-size: 0.85rem;">未设置</span>
+            {% endif %}
+          </span>
+        </td>
+        <td>
+          <span style="font-size: 0.8rem; color: var(--text-secondary);">
+            {% if ip.source == 'manual' %}手动
+            {% elif ip.source == 'bulk_deploy' %}批量部署
+            {% elif ip.source == 'quick_add' %}快速添加
+            {% elif ip.source == 'migrated' %}迁移
+            {% else %}{{ ip.source }}
+            {% endif %}
+          </span>
+        </td>
+        <td style="font-size: 0.8rem; color: var(--text-secondary);">{{ ip.created_at[:16] if ip.created_at else '—' }}</td>
+        <td style="text-align: right;">
+          <div style="display: inline-flex; gap: 8px; align-items: center;">
+            <form style="display: inline-flex; gap: 4px; align-items: center; margin: 0;"
+                  hx-put="/api/ip-addresses/{{ ip.id }}"
+                  hx-target="#ip-address-list"
+                  hx-swap="outerHTML">
+              <input type="text" name="tag" value="{{ ip.tag }}"
+                     class="form-input"
+                     placeholder="标签"
+                     style="width: 100px; height: 30px; font-size: 0.8rem; padding: 2px 8px;">
+              <button type="submit"
+                      class="btn btn-secondary btn-sm"
+                      style="height: 30px; padding: 2px 8px; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center;">
+                保存
+                <span class="spinner htmx-indicator" style="display: none;"></span>
+              </button>
+            </form>
+            <button class="btn btn-danger btn-sm"
+                    style="height: 30px; padding: 2px 8px; font-size: 0.78rem; display: inline-flex; align-items: center; justify-content: center;"
+                    hx-delete="/api/ip-addresses/{{ ip.id }}"
+                    hx-target="#ip-address-list"
+                    hx-swap="outerHTML"
+                    hx-confirm="确定要删除 IP 地址 {{ ip.ip_cidr }} 吗？">
+              删除
+            </button>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="glass-card empty-state" style="padding: 40px; text-align: center; color: var(--text-muted);">
+  <div style="font-size: 2.5rem; margin-bottom: 12px;">🏷️</div>
+  <p>暂无已注册的 IP 地址。请在上方添加。</p>
+</div>
+{% endif %}
+</div>

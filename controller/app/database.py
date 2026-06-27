@@ -1,5 +1,6 @@
 """SQLite database layer for VPS UFW Firewall Manager."""
 
+import logging
 import os
 from pathlib import Path
 import aiosqlite
@@ -8,6 +9,8 @@ DB_PATH = os.environ.get(
     "SNELL_DB",
     str(Path(__file__).parent.parent / "data" / "snell_manager.db"),
 )
+
+logger = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
@@ -42,6 +45,15 @@ CREATE TABLE IF NOT EXISTS ip_group_items (
     UNIQUE(group_id, ip_cidr)
 );
 
+CREATE TABLE IF NOT EXISTS ip_addresses (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    ip_cidr     TEXT NOT NULL UNIQUE,
+    tag         TEXT DEFAULT '',
+    source      TEXT DEFAULT 'manual',
+    created_at  TEXT DEFAULT (datetime('now')),
+    updated_at  TEXT DEFAULT (datetime('now'))
+);
+
 CREATE TABLE IF NOT EXISTS op_logs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     node_id     INTEGER REFERENCES nodes(id) ON DELETE SET NULL,
@@ -63,7 +75,7 @@ async def init_db():
         await db.execute("PRAGMA foreign_keys=ON")
         await db.executescript(SCHEMA)
         
-        # Check if country and country_code columns exist, if not add them dynamically
+        # Dynamic schema upgrades for nodes table
         cursor = await db.execute("PRAGMA table_info(nodes)")
         cols = [row[1] for row in await cursor.fetchall()]
         if "country" not in cols:
@@ -72,7 +84,40 @@ async def init_db():
             await db.execute("ALTER TABLE nodes ADD COLUMN country_code TEXT DEFAULT ''")
         if "tags" not in cols:
             await db.execute("ALTER TABLE nodes ADD COLUMN tags TEXT DEFAULT ''")
-            
+
+        # --- Migrate legacy ip_groups + ip_group_items → ip_addresses ---
+        try:
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM ip_group_items"
+            )
+            legacy_count = (await cursor.fetchone())[0]
+
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM ip_addresses WHERE source = 'migrated'"
+            )
+            migrated_count = (await cursor.fetchone())[0]
+
+            if legacy_count > 0 and migrated_count == 0:
+                logger.info(
+                    "Migrating %d legacy ip_group_items → ip_addresses...",
+                    legacy_count,
+                )
+                await db.execute("""
+                    INSERT OR IGNORE INTO ip_addresses (ip_cidr, tag, source, created_at, updated_at)
+                    SELECT
+                        gi.ip_cidr,
+                        g.name,
+                        'migrated',
+                        gi.created_at,
+                        datetime('now')
+                    FROM ip_group_items gi
+                    JOIN ip_groups g ON gi.group_id = g.id
+                """)
+                logger.info("Legacy IP group data migration complete.")
+        except Exception:
+            # ip_group_items or ip_groups may not exist yet on a fresh DB
+            pass
+
         await db.commit()
 
 
@@ -141,7 +186,106 @@ async def delete_node(node_id: int) -> None:
 
 
 # ---------------------------------------------------------------------------
-# IP Groups
+# IP Addresses (unified IP management — replaces legacy ip_groups)
+# ---------------------------------------------------------------------------
+
+async def get_all_ip_addresses() -> list[dict]:
+    """Return all registered IP addresses ordered by tag then IP."""
+    async with _get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM ip_addresses ORDER BY tag, ip_cidr"
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_ip_remarks_map() -> dict[str, str]:
+    """Return {ip_cidr: tag} dict for quick lookup during template rendering."""
+    async with _get_db() as db:
+        cursor = await db.execute(
+            "SELECT ip_cidr, tag FROM ip_addresses WHERE tag != ''"
+        )
+        return {row[0]: row[1] for row in await cursor.fetchall()}
+
+
+async def get_all_tags() -> list[str]:
+    """Return deduplicated list of all non-empty tags."""
+    async with _get_db() as db:
+        cursor = await db.execute(
+            "SELECT DISTINCT tag FROM ip_addresses WHERE tag != '' ORDER BY tag"
+        )
+        return [row[0] for row in await cursor.fetchall()]
+
+
+async def get_ips_by_tag(tag: str) -> list[dict]:
+    """Return all IP addresses that share the given tag."""
+    async with _get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM ip_addresses WHERE tag = ? ORDER BY ip_cidr",
+            (tag,),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+async def upsert_ip_address(ip_cidr: str, tag: str = "", source: str = "manual") -> int:
+    """Insert a new IP or update existing IP's tag. Returns the row id."""
+    async with _get_db() as db:
+        cursor = await db.execute(
+            """INSERT INTO ip_addresses (ip_cidr, tag, source, updated_at)
+               VALUES (?, ?, ?, datetime('now'))
+               ON CONFLICT(ip_cidr) DO UPDATE SET
+                   tag = CASE WHEN excluded.tag != '' THEN excluded.tag ELSE ip_addresses.tag END,
+                   updated_at = datetime('now')""",
+            (ip_cidr, tag, source),
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+
+async def update_ip_address(ip_id: int, **kwargs) -> None:
+    """Update an IP address record (e.g. tag, source)."""
+    if not kwargs:
+        return
+    kwargs["updated_at"] = "datetime('now')"
+    async with _get_db() as db:
+        parts = []
+        values = []
+        for k, v in kwargs.items():
+            if v == "datetime('now')":
+                parts.append(f"{k} = datetime('now')")
+            else:
+                parts.append(f"{k} = ?")
+                values.append(v)
+        values.append(ip_id)
+        await db.execute(
+            f"UPDATE ip_addresses SET {', '.join(parts)} WHERE id = ?",
+            values,
+        )
+        await db.commit()
+
+
+async def delete_ip_address(ip_id: int) -> None:
+    """Delete an IP address record by id."""
+    async with _get_db() as db:
+        await db.execute("DELETE FROM ip_addresses WHERE id = ?", (ip_id,))
+        await db.commit()
+
+
+async def search_ip_addresses(query: str) -> list[dict]:
+    """Fuzzy search IP addresses by ip_cidr or tag."""
+    async with _get_db() as db:
+        db.row_factory = aiosqlite.Row
+        pattern = f"%{query}%"
+        cursor = await db.execute(
+            "SELECT * FROM ip_addresses WHERE ip_cidr LIKE ? OR tag LIKE ? ORDER BY tag, ip_cidr",
+            (pattern, pattern),
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# Legacy IP Groups (kept for backward compatibility during migration)
 # ---------------------------------------------------------------------------
 
 async def get_all_ip_groups() -> list[dict]:

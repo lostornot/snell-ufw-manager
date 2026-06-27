@@ -217,14 +217,22 @@ async def dashboard(request: Request, group: str = "none"):
 
 
 
-@app.get("/ip-groups", response_class=HTMLResponse)
-async def ip_groups_page(request: Request):
-    """IP groups library management page."""
-    groups = await db.get_all_ip_groups()
+@app.get("/ip-manage", response_class=HTMLResponse)
+async def ip_manage_page(request: Request):
+    """IP address management page (replaces legacy IP groups)."""
+    ip_addresses = await db.get_all_ip_addresses()
+    all_tags = await db.get_all_tags()
     return templates.TemplateResponse(
         "ip_groups.html",
-        {"request": request, "groups": groups},
+        {"request": request, "ip_addresses": ip_addresses, "all_tags": all_tags},
     )
+
+
+# Legacy redirect for old bookmarks
+@app.get("/ip-groups", response_class=HTMLResponse)
+async def ip_groups_redirect(request: Request):
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/ip-manage", status_code=301)
 
 
 @app.get("/nodes/manage", response_class=HTMLResponse)
@@ -260,14 +268,14 @@ async def node_detail(request: Request, node_id: int):
             node["country"] = country
             node["country_code"] = country_code
             
-    ip_groups = await db.get_all_ip_groups()
+    all_tags = await db.get_all_tags()
     all_nodes = await db.get_all_nodes()
     return templates.TemplateResponse(
         "node_detail.html",
         {
             "request": request,
             "node": node,
-            "ip_groups": ip_groups,
+            "all_tags": all_tags,
             "all_nodes": all_nodes,
             "access_log_hours": config.log.access_log_hours,
         },
@@ -401,9 +409,12 @@ async def api_port_cards_grid(request: Request, node_id: int):
         else:
             p_info["protocol_label"] = "all"
 
+    # Get IP remarks for display
+    ip_remarks = await db.get_ip_remarks_map()
+
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
-        {"request": request, "node": node, "port_data": port_data},
+        {"request": request, "node": node, "port_data": port_data, "ip_remarks": ip_remarks},
     )
 
 
@@ -413,10 +424,10 @@ async def api_open_port(
     node_id: int,
     port: int = Form(...),
     protocol: str = Form("both"),
-    tag: str = Form("Custom Rule"),
+    service_tag: str = Form("Custom Rule"),
     initial_ip: str = Form(""),
-    initial_ip_group_id: str = Form(""),
-    new_group_name: str = Form(""),
+    ip_tag: str = Form(""),
+    ip_tag_select: str = Form(""),
     target_node_ids: list[str] = Form(default=[]),
 ):
     """Open a UFW service port on multiple nodes and return updated Port Cards Grid for current node."""
@@ -427,31 +438,21 @@ async def api_open_port(
     if port < 1 or port > 65535:
         raise HTTPException(status_code=400, detail="Invalid port number")
 
-    parsed_group_id = None
-    created_group_msg = ""
-    if initial_ip_group_id == "__new__" and new_group_name.strip():
-        try:
-            parsed_group_id = await db.create_ip_group(new_group_name.strip(), "由端口部署自动创建")
-            created_group_msg = f"并新建分组「{new_group_name.strip()}」"
-            if initial_ip and initial_ip.strip():
-                await db.add_ip_group_item(parsed_group_id, initial_ip.strip(), f"在端口 {port} 部署时自动添加")
-        except Exception:
-            pass
-    elif initial_ip_group_id.strip() and initial_ip_group_id != "__new__":
-        try:
-            parsed_group_id = int(initial_ip_group_id)
-        except ValueError:
-            pass
-
-    # Determine whitelist targets
+    # Determine whitelist targets: either a single IP or all IPs under a tag
     targets = []
+    tag_label = ip_tag.strip()
+
     if initial_ip and initial_ip.strip():
-        targets.append((initial_ip.strip(), "Initial IP"))
-    elif parsed_group_id:
-        group = await db.get_ip_group(parsed_group_id)
-        if group:
-            for item in group.get("ips", []):
-                targets.append((item["ip_cidr"], f"Group: {group['name']}"))
+        targets.append((initial_ip.strip(), "IP"))
+    elif ip_tag_select and ip_tag_select.strip():
+        # Load all IPs with this tag for batch deployment
+        tag_ips = await db.get_ips_by_tag(ip_tag_select.strip())
+        tag_label = ip_tag_select.strip()
+        for item in tag_ips:
+            targets.append((item["ip_cidr"], f"标签: {tag_label}"))
+        if not targets:
+            toast = {"type": "error", "message": f"❌ 标签「{tag_label}」下没有任何 IP 地址"}
+            return await render_ports_grid_with_toast(request, current_node, toast)
     else:
         # Default: open to Anywhere
         targets.append(("anywhere", "Public Access"))
@@ -537,13 +538,19 @@ async def api_open_port(
             added_ips.append(ip)
 
         if node_success:
-            log_detail = f"批量部署开通端口 {port}/{protocol} ({tag})。授权: {', '.join(added_ips)}"
+            log_detail = f"批量部署开通端口 {port}/{protocol} ({service_tag})。授权: {', '.join(added_ips)}"
             await db.add_op_log(nid, target_node["name"], "OPEN_PORT", f"{port}", log_detail, True)
             success_nodes.append(target_node["name"])
         else:
-            log_detail = f"批量部署端口 {port}/{protocol} ({tag}) 失败。尝试授权: {', '.join(targets_to_add)}，原因: {node_error_msg}"
+            log_detail = f"批量部署端口 {port}/{protocol} ({service_tag}) 失败。尝试授权: {', '.join(targets_to_add)}，原因: {node_error_msg}"
             await db.add_op_log(nid, target_node["name"], "OPEN_PORT", f"{port}", log_detail, False)
             failed_nodes.append(f"{target_node['name']} ({node_error_msg})")
+
+    # Register IPs with tags in ip_addresses table
+    if success_nodes:
+        for ip, desc in targets:
+            if ip not in ("anywhere", "any", "all"):
+                await db.upsert_ip_address(ip, tag_label, "bulk_deploy")
 
     # Generate comprehensive toast message
     if failed_nodes:
@@ -560,12 +567,12 @@ async def api_open_port(
     else:
         toast = {
             "type": "success",
-            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上开放端口 {port}{created_group_msg}并部署白名单！"
+            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上开放端口 {port} 并部署白名单！"
         }
 
     # Re-render current node's ports grid with toast
-    refreshed_groups = await db.get_all_ip_groups()
-    return await render_ports_grid_with_toast(request, current_node, toast, ip_groups=refreshed_groups)
+    refreshed_tags = await db.get_all_tags()
+    return await render_ports_grid_with_toast(request, current_node, toast, all_tags=refreshed_tags)
 
 
 @app.post("/api/nodes/{node_id}/ports/bulk-delete", response_class=HTMLResponse)
@@ -575,20 +582,13 @@ async def api_bulk_delete_port_rule(
     port: int = Form(...),
     protocol: str = Form("both"),
     initial_ip: str = Form(""),
-    initial_ip_group_id: str = Form(""),
+    ip_tag_select: str = Form(""),
     target_node_ids: list[str] = Form(default=[]),
 ):
-    """Bulk delete whitelisted IP/Group on a port across multiple nodes."""
+    """Bulk delete whitelisted IP/tag on a port across multiple nodes."""
     current_node = await db.get_node(node_id)
     if not current_node:
         raise HTTPException(status_code=404)
-        
-    parsed_group_id = None
-    if initial_ip_group_id.strip():
-        try:
-            parsed_group_id = int(initial_ip_group_id)
-        except ValueError:
-            pass
 
     # Determine targets to delete
     targets = []
@@ -596,15 +596,14 @@ async def api_bulk_delete_port_rule(
     if initial_ip and initial_ip.strip():
         targets.append(initial_ip.strip())
         desc_label = f"IP: {initial_ip.strip()}"
-    elif parsed_group_id:
-        group = await db.get_ip_group(parsed_group_id)
-        if group:
-            for item in group.get("ips", []):
-                targets.append(item["ip_cidr"])
-            desc_label = f"IP 分组: {group['name']}"
+    elif ip_tag_select and ip_tag_select.strip():
+        tag_ips = await db.get_ips_by_tag(ip_tag_select.strip())
+        for item in tag_ips:
+            targets.append(item["ip_cidr"])
+        desc_label = f"标签: {ip_tag_select.strip()}"
 
     if not targets:
-        toast = {"type": "error", "message": "❌ 请输入或选择需要批量删除的白名单 IP/IP 分组！"}
+        toast = {"type": "error", "message": "❌ 请输入 IP 或选择标签来批量删除白名单！"}
         return await render_ports_grid_with_toast(request, current_node, toast)
 
     # Validate all targets first
@@ -721,7 +720,7 @@ async def api_close_port(request: Request, node_id: int, port: int):
 
 
 # Helper to re-render the grid
-async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict | None, ip_groups: list | None = None):
+async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict | None, all_tags: list | None = None):
     wl_result = await ssh.get_whitelist(node)
     rules = wl_result.get("rules", []) if wl_result.get("ok") else []
     port_data = {}
@@ -744,9 +743,12 @@ async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict
         else:
             p_info["protocol_label"] = "all"
 
+    # Get IP remarks for display
+    ip_remarks = await db.get_ip_remarks_map()
+
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
-        {"request": request, "node": node, "port_data": port_data, "toast": toast, "ip_groups": ip_groups},
+        {"request": request, "node": node, "port_data": port_data, "toast": toast, "ip_remarks": ip_remarks, "all_tags": all_tags},
     )
 
 
@@ -760,28 +762,31 @@ async def api_whitelist_ip(
     node_id: int,
     port: int,
     ip_cidr: str = Form(...),
+    remark: str = Form(""),
 ):
-    """Whitelist a single IP/CIDR or expand an entire IP Group on this port card."""
+    """Whitelist a single IP/CIDR or expand a tag on this port card."""
     node = await db.get_node(node_id)
     if not node:
         raise HTTPException(status_code=404)
 
     ip_cidr = ip_cidr.strip()
+    remark = remark.strip()
     success = True
     added_ips = []
     error_msg = ""
 
-    # Check if input matches an IP Group name
-    groups = await db.get_all_ip_groups()
-    matching_group = None
-    for g in groups:
-        if g["name"].lower() == ip_cidr.lower():
-            matching_group = g
+    # Check if input matches an existing tag name → batch expand
+    all_tags = await db.get_all_tags()
+    matching_tag = None
+    for t in all_tags:
+        if t.lower() == ip_cidr.lower():
+            matching_tag = t
             break
 
-    if matching_group:
-        # Expand group and add all IPs
-        for item in matching_group["ips"]:
+    if matching_tag:
+        # Expand tag and add all IPs
+        tag_ips = await db.get_ips_by_tag(matching_tag)
+        for item in tag_ips:
             ip = item["ip_cidr"]
             result = await ssh.run(node, f"add {ip} {port} both")
             if not result.get("ok"):
@@ -789,7 +794,7 @@ async def api_whitelist_ip(
                 error_msg = result.get("error")
                 break
             added_ips.append(ip)
-        log_detail = f"批量授权 IP 分组「{matching_group['name']}」到端口 {port}。IP列表: {', '.join(added_ips)}"
+        log_detail = f"批量授权标签「{matching_tag}」到端口 {port}。IP列表: {', '.join(added_ips)}"
     else:
         # Standalone IP/CIDR
         if not validate_ip_cidr(ip_cidr):
@@ -802,6 +807,9 @@ async def api_whitelist_ip(
                 error_msg = result.get("error")
             else:
                 added_ips.append(ip_cidr)
+                # Register IP with tag
+                if ip_cidr not in ("anywhere", "any", "all"):
+                    await db.upsert_ip_address(ip_cidr, remark, "manual")
         log_detail = f"授权 {ip_cidr} 到端口 {port}。"
 
     if not success:
@@ -812,8 +820,8 @@ async def api_whitelist_ip(
     if not success:
         toast = {"type": "error", "message": f"❌ 授权失败: {error_msg}"}
     else:
-        group_tag = f" 分组「{matching_group['name']}」" if matching_group else ""
-        toast = {"type": "success", "message": f"✅ 已成功将{group_tag} {ip_cidr} 放行到端口 {port}"}
+        tag_label = f" 标签「{matching_tag}」" if matching_tag else ""
+        toast = {"type": "success", "message": f"✅ 已成功将{tag_label} {ip_cidr} 放行到端口 {port}"}
 
     # Re-render single port card
     return await render_single_port_card(request, node, port, toast)
@@ -870,122 +878,81 @@ async def render_single_port_card(request: Request, node: dict, port: int, toast
         "rules": port_rules
     }
 
+    # Get IP remarks for display
+    ip_remarks = await db.get_ip_remarks_map()
+
     resp = templates.TemplateResponse(
         "partials/port_card.html",
-        {"request": request, "node": node, "data": data, "toast": toast},
+        {"request": request, "node": node, "data": data, "toast": toast, "ip_remarks": ip_remarks},
     )
     resp.headers["HX-Trigger"] = "rules-updated"
     return resp
 
 
 # ---------------------------------------------------------------------------
-# API: IP Group Library Operations
+# API: IP Address Management (replaces legacy IP Group operations)
 # ---------------------------------------------------------------------------
 
-@app.post("/api/ip-groups", response_class=HTMLResponse)
-async def api_create_ip_group(
+@app.post("/api/ip-addresses", response_class=HTMLResponse)
+async def api_create_ip_address(
     request: Request,
-    name: str = Form(...),
-    remark: str = Form(""),
-):
-    """Create a new IP group in library."""
-    group_id = await db.create_ip_group(name, remark)
-    groups = await db.get_all_ip_groups()
-    
-    toast = {"type": "success", "message": f"✅ IP 分组「{name}」已创建！"}
-    return templates.TemplateResponse(
-        "partials/ip_group_list.html",
-        {
-            "request": request,
-            "groups": groups,
-            "new_group_id": group_id,
-            "toast": toast,
-        },
-    )
-
-
-@app.delete("/api/ip-groups/{group_id}", response_class=HTMLResponse)
-async def api_delete_ip_group(request: Request, group_id: int):
-    """Delete an IP group."""
-    group = await db.get_ip_group(group_id)
-    if not group:
-        raise HTTPException(status_code=404)
-        
-    await db.delete_ip_group(group_id)
-    groups = await db.get_all_ip_groups()
-    
-    toast = {"type": "success", "message": f"🗑️ IP 分组「{group['name']}」已删除"}
-    return templates.TemplateResponse(
-        "partials/ip_group_list.html",
-        {"request": request, "groups": groups, "toast": toast},
-    )
-
-
-@app.post("/api/ip-groups/{group_id}/ips", response_class=HTMLResponse)
-async def api_add_group_ip(
-    request: Request,
-    group_id: int,
     ip_cidr: str = Form(...),
-    note: str = Form(""),
+    tag: str = Form(""),
 ):
-    """Add an IP/CIDR to a group."""
+    """Add a new IP address to the registry."""
     ip_cidr = ip_cidr.strip()
+    tag = tag.strip()
     if not validate_ip_cidr(ip_cidr):
-        groups = await db.get_all_ip_groups()
+        ip_addresses = await db.get_all_ip_addresses()
+        toast = {"type": "error", "message": f"❌ 无效的 IP/CIDR 格式: {ip_cidr}"}
         return templates.TemplateResponse(
-            "partials/ip_group_list.html",
-            {
-                "request": request,
-                "groups": groups,
-                "new_group_id": group_id,
-                "toast": {"type": "error", "message": f"❌ 无效的 IP/CIDR 格式: {ip_cidr}"},
-            },
+            "partials/ip_address_list.html",
+            {"request": request, "ip_addresses": ip_addresses, "toast": toast},
         )
-        
-    try:
-        await db.add_ip_group_item(group_id, ip_cidr, note)
-    except Exception as exc:
-        if "UNIQUE" in str(exc):
-            groups = await db.get_all_ip_groups()
-            return templates.TemplateResponse(
-                "partials/ip_group_list.html",
-                {
-                    "request": request,
-                    "groups": groups,
-                    "new_group_id": group_id,
-                    "toast": {"type": "error", "message": f"❌ IP {ip_cidr} 已经存在于该分组中！"},
-                },
-            )
-        raise
 
-    groups = await db.get_all_ip_groups()
-    toast = {"type": "success", "message": f"✅ IP {ip_cidr} 已成功添加到分组中"}
+    try:
+        await db.upsert_ip_address(ip_cidr, tag, "manual")
+    except Exception as exc:
+        ip_addresses = await db.get_all_ip_addresses()
+        toast = {"type": "error", "message": f"❌ 添加失败: {exc}"}
+        return templates.TemplateResponse(
+            "partials/ip_address_list.html",
+            {"request": request, "ip_addresses": ip_addresses, "toast": toast},
+        )
+
+    ip_addresses = await db.get_all_ip_addresses()
+    toast = {"type": "success", "message": f"✅ IP {ip_cidr} 已添加" + (f"，标签: {tag}" if tag else "")}
     return templates.TemplateResponse(
-        "partials/ip_group_list.html",
-        {
-            "request": request,
-            "groups": groups,
-            "new_group_id": group_id,
-            "toast": toast,
-        },
+        "partials/ip_address_list.html",
+        {"request": request, "ip_addresses": ip_addresses, "toast": toast},
     )
 
 
-@app.delete("/api/ip-groups/{group_id}/ips/{ip_id}", response_class=HTMLResponse)
-async def api_delete_group_ip(request: Request, group_id: int, ip_id: int):
-    """Delete an IP from an IP group."""
-    await db.delete_ip_group_item(ip_id)
-    groups = await db.get_all_ip_groups()
-    
-    toast = {"type": "success", "message": "✅ IP 已从分组中移除"}
+@app.put("/api/ip-addresses/{ip_id}", response_class=HTMLResponse)
+async def api_update_ip_address(
+    request: Request,
+    ip_id: int,
+    tag: str = Form(""),
+):
+    """Update an IP address tag."""
+    await db.update_ip_address(ip_id, tag=tag.strip())
+    ip_addresses = await db.get_all_ip_addresses()
+    toast = {"type": "success", "message": "✅ 标签已更新"}
     return templates.TemplateResponse(
-        "partials/ip_group_list.html",
-        {
-            "request": request,
-            "groups": groups,
-            "new_group_id": group_id,
-            "toast": toast,
-        },
+        "partials/ip_address_list.html",
+        {"request": request, "ip_addresses": ip_addresses, "toast": toast},
+    )
+
+
+@app.delete("/api/ip-addresses/{ip_id}", response_class=HTMLResponse)
+async def api_delete_ip_address(request: Request, ip_id: int):
+    """Delete an IP address record."""
+    await db.delete_ip_address(ip_id)
+    ip_addresses = await db.get_all_ip_addresses()
+    toast = {"type": "success", "message": "✅ IP 地址已删除"}
+    return templates.TemplateResponse(
+        "partials/ip_address_list.html",
+        {"request": request, "ip_addresses": ip_addresses, "toast": toast},
     )
 
 
@@ -1466,7 +1433,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24):
             if str(r.get("port")) == str(node["snell_port"]):
                 allowed_set.add(r.get("ip"))
 
-    ip_groups = await db.get_all_ip_groups()
+    all_tags = await db.get_all_tags()
     return templates.TemplateResponse(
         "partials/access_log.html",
         {
@@ -1474,7 +1441,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24):
             "node": node,
             "result": result,
             "allowed_set": allowed_set,
-            "all_groups": ip_groups,
+            "all_tags": all_tags,
         },
     )
 
@@ -1484,69 +1451,20 @@ async def api_quick_add(
     request: Request,
     node_id: int,
     ip_cidr: str = Form(...),
-    group_id: str = Form(...),
-    new_group_name: str | None = Form(None),
+    tag: str = Form(""),
 ):
+    """Quick-add an IP from the access log with a tag."""
     ip_cidr = ip_cidr.strip()
+    tag = tag.strip()
     if not validate_ip_cidr(ip_cidr):
         return templates.TemplateResponse(
             "partials/toast.html",
             {"request": request, "toast": {"type": "error", "message": f"无效 IP: {ip_cidr}"}},
         )
 
-    resolved_group_id = None
-    group_name = ""
-
-    if group_id == "__new__":
-        if not new_group_name or not new_group_name.strip():
-            return templates.TemplateResponse(
-                "partials/toast.html",
-                {"request": request, "toast": {"type": "error", "message": "新分组名称不能为空"}},
-            )
-        new_group_name = new_group_name.strip()
-        try:
-            existing_groups = await db.get_all_ip_groups()
-            existing_g = None
-            for g in existing_groups:
-                if g["name"].lower() == new_group_name.lower():
-                    existing_g = g
-                    break
-            
-            if existing_g:
-                resolved_group_id = existing_g["id"]
-                group_name = existing_g["name"]
-            else:
-                resolved_group_id = await db.create_ip_group(new_group_name, "从安全日志拦截列表快速创建")
-                group_name = new_group_name
-        except Exception as exc:
-            return templates.TemplateResponse(
-                "partials/toast.html",
-                {"request": request, "toast": {"type": "error", "message": f"创建新分组失败: {exc}"}},
-            )
-    else:
-        try:
-            resolved_group_id = int(group_id)
-        except ValueError:
-            return templates.TemplateResponse(
-                "partials/toast.html",
-                {"request": request, "toast": {"type": "error", "message": "无效的分组 ID"}},
-            )
-        group = await db.get_ip_group(resolved_group_id)
-        if not group:
-            return templates.TemplateResponse(
-                "partials/toast.html",
-                {"request": request, "toast": {"type": "error", "message": "IP 分组不存在"}},
-            )
-        group_name = group["name"]
-
     try:
-        await db.add_ip_group_item(resolved_group_id, ip_cidr, "快速添加")
+        await db.upsert_ip_address(ip_cidr, tag, "quick_add")
     except Exception as exc:
-        if "UNIQUE" in str(exc):
-            return templates.TemplateResponse(
-                "partials/toast.html",
-                {"request": request, "toast": {"type": "warning", "message": f"{ip_cidr} 已在组 {group_name} 中"}},
-            )
         return templates.TemplateResponse(
             "partials/toast.html",
             {"request": request, "toast": {"type": "error", "message": f"添加失败: {exc}"}},
@@ -1555,7 +1473,7 @@ async def api_quick_add(
     node = await db.get_node(node_id)
     await db.add_op_log(
         node_id, node["name"] if node else "unknown", "QUICK_ADD",
-        ip_cidr, f"快速加入 IP 分组: {group_name}",
+        ip_cidr, f"快速注册 IP 到地址管理" + (f"，标签: {tag}" if tag else ""),
         success=True
     )
 
@@ -1565,7 +1483,7 @@ async def api_quick_add(
             "request": request,
             "toast": {
                 "type": "success",
-                "message": f"已将 {ip_cidr} 快速加入 IP 分组「{group_name}」",
+                "message": f"已将 {ip_cidr} 注册到 IP 地址管理" + (f"，标签「{tag}」" if tag else ""),
             },
         },
     )

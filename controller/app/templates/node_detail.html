@@ -71,7 +71,7 @@
             hx-target="#port-cards-grid"
             hx-swap="innerHTML"
             hx-indicator="#port-action-spinner"
-            hx-on::after-request="if(event.detail.successful) { this.reset(); updateSelectedCount(); handleSidebarGroupChange(this.querySelector('select[name=\'initial_ip_group_id\']')); }">
+            hx-on::after-request="if(event.detail.successful) { this.reset(); updateSelectedCount(); }">
         
         <!-- Section 1: Service and Port -->
         <div class="form-section-card">
@@ -92,7 +92,7 @@
           </div>
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">服务标签 *</label>
-            <select name="tag" class="form-select">
+            <select name="service_tag" class="form-select">
               <option value="Snell Proxy">Snell Proxy (代理)</option>
               <option value="SSH Access">SSH Access (运维)</option>
               <option value="Custom Rule">Custom Rule (自定义)</option>
@@ -100,7 +100,7 @@
           </div>
         </div>
 
-        <!-- Section 2: IP Whitelist -->
+        <!-- Section 2: IP Whitelist (Tag-based) -->
         <div class="form-section-card">
           <div class="form-section-header" style="color: var(--accent-blue);">
             <span>💡</span> IP 授权白名单
@@ -109,19 +109,18 @@
             <label class="form-label">单一 IP 或网段 (CIDR)</label>
             <input type="text" name="initial_ip" class="form-input mono" placeholder="例如: 1.2.3.4">
           </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">或选择现有 IP 分组</label>
-            <select name="initial_ip_group_id" id="sidebar-ip-group-select" class="form-select" onchange="handleSidebarGroupChange(this)">
-              <option value="">-- 不关联分组 --</option>
-              {% for group in ip_groups %}
-              <option value="{{ group.id }}">{{ group.name }} (包含 {{ group.ips | length }} IP)</option>
-              {% endfor %}
-              <option value="__new__">➕ 新建分组...</option>
-            </select>
+          <div class="form-group">
+            <label class="form-label">IP 标签</label>
+            <input type="text" name="ip_tag" class="form-input" placeholder="如：家庭宽带、NL中转">
           </div>
-          <div class="form-group" id="sidebar-new-group-group" style="display: none; margin-top: 10px; margin-bottom: 0;">
-            <label class="form-label" style="font-size: 0.75rem;">新分组名称 *</label>
-            <input type="text" name="new_group_name" class="form-input" placeholder="输入新组名" disabled>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">或选择现有标签批量放行</label>
+            <select name="ip_tag_select" id="sidebar-ip-tag-select" class="form-select">
+              <option value="">-- 不关联标签 --</option>
+              {% for tag in all_tags %}
+              <option value="{{ tag }}">{{ tag }}</option>
+              {% endfor %}
+            </select>
           </div>
         </div>
 
@@ -172,7 +171,7 @@
           <button type="submit" 
                   class="btn btn-danger w-full" 
                   hx-post="/api/nodes/{{ node.id }}/ports/bulk-delete"
-                  hx-confirm="确定要在选中的所有 VPS 上，针对该端口删除对应的 IP/IP 分组白名单规则吗？"
+                  hx-confirm="确定要在选中的所有 VPS 上，针对该端口删除对应的 IP 白名单规则吗？"
                   style="font-weight: bold;">
             <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
             确认批量删除白名单
@@ -207,21 +206,6 @@ function updateSelectedCount() {
     placeholder.textContent = '选择应用节点...';
     placeholder.style.color = 'var(--text-muted)';
     placeholder.style.fontWeight = 'normal';
-  }
-}
-
-function handleSidebarGroupChange(selectEl) {
-  const container = document.getElementById('sidebar-new-group-group');
-  if (!container) return;
-  const input = container.querySelector('input[name="new_group_name"]');
-  if (selectEl.value === '__new__') {
-    container.style.display = 'block';
-    input.disabled = false;
-    input.focus();
-  } else {
-    container.style.display = 'none';
-    input.disabled = true;
-    input.value = '';
   }
 }
 

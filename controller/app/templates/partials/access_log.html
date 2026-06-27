@@ -46,20 +46,15 @@
               <!-- Divider -->
               <span class="text-muted" style="font-size:0.8rem;color:rgba(15,23,42,0.15);">|</span>
 
-              <!-- Action 2: Add to IP group -->
+              <!-- Action 2: Quick-add to IP address registry with tag -->
               <form style="display:inline-flex;align-items:center;gap:6px;margin:0;padding:0;white-space: nowrap;" hx-post="/api/nodes/{{ node.id }}/quick-add"
                     hx-target="#toast-container" hx-swap="beforeend">
                 <input type="hidden" name="ip_cidr" value="{{ c.ip }}">
-                <span class="text-secondary" style="font-size:0.75rem;white-space: nowrap;">添加到组:</span>
-                <select name="group_id" class="form-select" style="width:auto;display:inline-block;padding:3px 8px;font-size:0.8rem;white-space: nowrap;height:28px;" title="选择要加入的 IP 分组" onchange="handleGroupSelectChange(this)">
-                  {% for group in all_groups %}
-                  <option value="{{ group.id }}">{{ group.name }}</option>
-                  {% endfor %}
-                  <option value="__new__">➕ 新建分组...</option>
-                </select>
-                <input type="text" name="new_group_name" placeholder="新组名" style="display:none;width:90px;height:28px;padding:3px 8px;font-size:0.8rem;border:1px solid rgba(15,23,42,0.15);border-radius:4px;margin-left:2px;" required disabled>
-                <button type="submit" class="btn btn-success btn-sm" style="white-space: nowrap;height:28px;padding:2px 8px;" title="将该 IP 加入选中的 IP 分组">
-                  加入
+                <span class="text-secondary" style="font-size:0.75rem;white-space: nowrap;">标签:</span>
+                <input type="text" name="tag" class="form-input" placeholder="标签(可选)" 
+                       style="width:90px;height:28px;padding:3px 8px;font-size:0.8rem;border:1px solid rgba(15,23,42,0.15);border-radius:4px;">
+                <button type="submit" class="btn btn-success btn-sm" style="white-space: nowrap;height:28px;padding:2px 8px;" title="将该 IP 注册到 IP 地址管理">
+                  注册
                 </button>
               </form>
             </div>
@@ -87,21 +82,3 @@
     <p>加载中...</p>
   </div>
 {% endif %}
-
-<script>
-if (typeof window.handleGroupSelectChange !== 'function') {
-  window.handleGroupSelectChange = function(selectEl) {
-    const form = selectEl.closest('form');
-    const input = form.querySelector('input[name="new_group_name"]');
-    if (selectEl.value === '__new__') {
-      input.style.display = 'inline-block';
-      input.disabled = false;
-      input.focus();
-    } else {
-      input.style.display = 'none';
-      input.disabled = true;
-      input.value = '';
-    }
-  }
-}
-</script>
