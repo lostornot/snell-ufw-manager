@@ -179,6 +179,31 @@ def apply_ufw_policy(db: Session, node_id: int) -> dict[str, Any]:
     )
 
 
+def enable_ufw(
+    db: Session,
+    node_id: int,
+    *,
+    emergency_ssh_cidr: str,
+    confirmed: bool,
+    ssh_allowed: bool,
+) -> dict[str, Any]:
+    node = _get_node(db, node_id)
+    payload = {
+        "confirmed": confirmed,
+        "ssh_allowed": ssh_allowed,
+        "emergency_ssh_cidr": emergency_ssh_cidr,
+    }
+    return _locked_remote_call(
+        db,
+        action="ufw.enable",
+        operation_type="ufw enable",
+        node=node,
+        request_json=payload,
+        namespace="ufw",
+        subcommand="enable",
+    )
+
+
 def apply_snell_config(db: Session, node_id: int) -> dict[str, Any]:
     node = _get_node(db, node_id)
     payload = {

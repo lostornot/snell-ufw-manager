@@ -311,7 +311,20 @@ def enable_ufw(payload: dict[str, Any]) -> tuple[int, dict[str, Any] | None, dic
             "code": "UFW_ENABLE_UNSAFE",
             "message": "refusing to enable UFW without safe SSH access",
         }
-    return 0, {"would_enable": True, "dry_run": bool(payload.get("dry_run"))}, None
+    commands = [["ufw", "--force", "enable"]]
+    if not payload.get("dry_run"):
+        completed = run_command(commands[0])
+        if completed.returncode != 0:
+            return completed.returncode, None, {
+                "code": "UFW_ENABLE_FAILED",
+                "message": completed.stderr or "ufw enable failed",
+            }
+    return 0, {
+        "would_enable": True,
+        "enabled": not bool(payload.get("dry_run")),
+        "dry_run": bool(payload.get("dry_run")),
+        "commands": commands,
+    }, None
 
 
 def main(argv: list[str]) -> int:

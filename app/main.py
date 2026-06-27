@@ -43,6 +43,7 @@ from app.services.remote_actions import (
     read_snell_logs,
     apply_snell_config,
     apply_ufw_policy,
+    enable_ufw,
     refresh_access_candidates,
     refresh_node_status,
     refresh_ufw_list,
@@ -412,6 +413,23 @@ def create_app() -> FastAPI:
     @app.post("/nodes/{node_id}/apply-ufw", dependencies=[Depends(verify_csrf)])
     def node_apply_ufw(node_id: int, db: Session = Depends(get_session_db)) -> RedirectResponse:
         return run_node_action(apply_ufw_policy, db, node_id)
+
+    @app.post("/nodes/{node_id}/enable-ufw", dependencies=[Depends(verify_csrf)])
+    def node_enable_ufw(
+        node_id: int,
+        emergency_ssh_cidr: str = Form(default=""),
+        ssh_allowed: str | None = Form(default=None),
+        confirmed: str | None = Form(default=None),
+        db: Session = Depends(get_session_db),
+    ) -> RedirectResponse:
+        enable_ufw(
+            db,
+            node_id,
+            emergency_ssh_cidr=emergency_ssh_cidr,
+            ssh_allowed=ssh_allowed == "on",
+            confirmed=confirmed == "on",
+        )
+        return RedirectResponse(f"/nodes/{node_id}", status_code=303)
 
     @app.post("/nodes/{node_id}/apply-config", dependencies=[Depends(verify_csrf)])
     def node_apply_config(node_id: int, db: Session = Depends(get_session_db)) -> RedirectResponse:

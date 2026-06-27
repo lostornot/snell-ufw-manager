@@ -129,6 +129,12 @@ UFW inactive: current whitelist rules are not enforcing access.
 
 Enabling UFW is a separate dangerous action requiring SSH lockout checks and confirmation.
 
+The node detail page exposes `启用 UFW` separately from `应用白名单`. It requires:
+
+- confirming SSH access is already allowed;
+- entering an emergency SSH CIDR;
+- explicit confirmation before the node tool runs `ufw --force enable`.
+
 Managed comments use:
 
 ```text

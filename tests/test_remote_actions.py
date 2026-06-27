@@ -14,6 +14,7 @@ from app.services.remote_actions import (
     read_snell_logs,
     apply_snell_config,
     apply_ufw_policy,
+    enable_ufw,
     refresh_access_candidates,
     refresh_node_status,
     refresh_ufw_list,
@@ -176,6 +177,32 @@ def test_write_operation_conflict_is_audited_without_remote_call(monkeypatch) ->
     assert audit.action == "ufw.apply"
     assert audit.success is False
     assert db.get(OperationLock, node.id) is not None
+
+
+def test_enable_ufw_uses_danger_confirmation_payload_and_lock(monkeypatch) -> None:
+    db = session()
+    node = create_node(db)
+    captured = {}
+
+    def fake_run(node_payload, namespace, subcommand, payload):
+        captured.update(namespace=namespace, subcommand=subcommand, payload=payload)
+        return ok_result({"would_enable": True})
+
+    monkeypatch.setattr(remote_actions, "run_remote_command", fake_run)
+
+    result = enable_ufw(db, node.id, emergency_ssh_cidr="203.0.113.0/24", confirmed=True, ssh_allowed=True)
+
+    audit = db.query(AuditLog).one()
+    assert result["ok"] is True
+    assert captured["namespace"] == "ufw"
+    assert captured["subcommand"] == "enable"
+    assert captured["payload"] == {
+        "confirmed": True,
+        "ssh_allowed": True,
+        "emergency_ssh_cidr": "203.0.113.0/24",
+    }
+    assert audit.action == "ufw.enable"
+    assert db.get(OperationLock, node.id) is None
 
 
 def test_apply_snell_config_sends_redacted_audit_payload(monkeypatch) -> None:

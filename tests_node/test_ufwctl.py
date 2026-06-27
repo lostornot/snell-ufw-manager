@@ -147,6 +147,24 @@ def test_enable_refuses_without_confirmation() -> None:
     assert body(process)["error"]["code"] == "UFW_ENABLE_UNCONFIRMED"
 
 
+def test_enable_returns_command_plan_for_safe_dry_run() -> None:
+    process = run_ufwctl(
+        "enable",
+        {
+            "dry_run": True,
+            "ssh_allowed": True,
+            "emergency_ssh_cidr": "203.0.113.0/24",
+            "confirmed": True,
+        },
+    )
+
+    assert process.returncode == 0
+    data = body(process)["data"]
+    assert data["commands"] == [["ufw", "--force", "enable"]]
+    assert data["would_enable"] is True
+    assert data["enabled"] is False
+
+
 def test_list_parses_ufw_status_numbered_fixture() -> None:
     process = run_ufwctl(
         "list",

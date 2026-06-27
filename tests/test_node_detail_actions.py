@@ -59,6 +59,7 @@ def test_node_detail_page_renders_action_forms(monkeypatch, tmp_path: Path) -> N
     assert 'action="/nodes/1/snell-restore"' in response.text
     assert 'action="/nodes/1/ufw-list"' in response.text
     assert 'action="/nodes/1/apply-ufw"' in response.text
+    assert 'action="/nodes/1/enable-ufw"' in response.text
     assert 'action="/nodes/1/apply-config"' in response.text
     assert 'action="/nodes/1/candidates"' in response.text
     assert 'action="/nodes/1/check-environment"' in response.text
@@ -84,6 +85,7 @@ def test_node_detail_actions_call_remote_services(monkeypatch, tmp_path: Path) -
     monkeypatch.setattr(main_module, "install_snell", fake_action)
     monkeypatch.setattr(main_module, "refresh_ufw_list", fake_action)
     monkeypatch.setattr(main_module, "apply_ufw_policy", fake_action)
+    monkeypatch.setattr(main_module, "enable_ufw", fake_action)
     monkeypatch.setattr(main_module, "apply_snell_config", fake_action)
     monkeypatch.setattr(main_module, "refresh_access_candidates", fake_action)
     monkeypatch.setattr(main_module, "check_node_environment", fake_action)
@@ -96,6 +98,7 @@ def test_node_detail_actions_call_remote_services(monkeypatch, tmp_path: Path) -
         "/nodes/1/install-snell",
         "/nodes/1/ufw-list",
         "/nodes/1/apply-ufw",
+        "/nodes/1/enable-ufw",
         "/nodes/1/apply-config",
         "/nodes/1/candidates",
         "/nodes/1/check-environment",
@@ -104,7 +107,7 @@ def test_node_detail_actions_call_remote_services(monkeypatch, tmp_path: Path) -
         assert response.status_code == 303
         assert response.headers["location"] == "/nodes/1"
 
-    assert calls == ["1", "1", "1", "1", "1", "1", "1"]
+    assert calls == ["1", "1", "1", "1", "1", "1", "1", "1"]
 
 
 def test_node_detail_snell_service_actions_call_remote_services(monkeypatch, tmp_path: Path) -> None:

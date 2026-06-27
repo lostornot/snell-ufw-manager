@@ -167,6 +167,14 @@
       <button type="submit" class="button-secondary">刷新疑似来源</button>
     </form>
   </div>
+  <form method="post" action="/nodes/{{ node.id }}/enable-ufw" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>应急 SSH CIDR <input name="emergency_ssh_cidr" placeholder="203.0.113.0/24" required></label>
+    <label class="check"><input name="ssh_allowed" type="checkbox" required> SSH 端口已放行</label>
+    <label class="check"><input name="confirmed" type="checkbox" required> 确认启用 UFW</label>
+    <button type="submit" class="button-danger">启用 UFW</button>
+  </form>
+  <p class="warning">危险操作：启用 UFW 前必须确认当前 SSH 端口和应急来源已放行，否则可能把自己锁在 VPS 外面。</p>
 </section>
 
 <section class="panel">
