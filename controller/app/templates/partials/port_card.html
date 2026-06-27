@@ -35,6 +35,13 @@
               {{ rule.ip }}
             {% endif %}
           </span>
+          {% if ip_geos is defined and rule.ip in ip_geos %}
+            {% set geo = ip_geos[rule.ip] %}
+            <span style="font-size: 0.72rem; color: var(--text-muted); cursor: help; display: inline-flex; align-items: center; gap: 2px;"
+                  title="国家: {{ geo.country }}&#10;城市: {{ geo.city }}&#10;运营商/ASN: {{ geo.asn }}">
+              {{ geo.flag }} <span style="font-size: 0.65rem; color: var(--text-secondary);">{{ geo.city }}</span>
+            </span>
+          {% endif %}
           {% if rule.ip != 'any' and rule.ip != 'anywhere' and rule.ip != 'Anywhere' %}
           <span class="ip-tag-badge-trigger" 
                 hx-get="/partials/ip-tag-edit?ip={{ rule.ip }}" 

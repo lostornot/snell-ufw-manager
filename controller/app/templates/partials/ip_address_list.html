@@ -9,6 +9,7 @@
     <thead>
       <tr>
         <th>IP / CIDR</th>
+        <th>归属地 / 网络</th>
         <th>标签</th>
         <th>来源</th>
         <th>添加时间</th>
@@ -19,6 +20,22 @@
       {% for ip in ip_addresses %}
       <tr data-ip="{{ ip.ip_cidr }}" data-tag="{{ ip.tag }}" id="ip-row-{{ ip.id }}">
         <td class="mono" style="font-size: 0.9rem; color: var(--text-primary); font-weight: 600;">{{ ip.ip_cidr }}</td>
+        <td>
+          {% if ip_geos is defined and ip.ip_cidr in ip_geos %}
+            {% set geo = ip_geos[ip.ip_cidr] %}
+            <span style="font-size: 0.85rem; display: inline-flex; align-items: center; gap: 4px;" title="运营商/ASN: {{ geo.asn }}">
+              <span>{{ geo.flag }}</span>
+              <span>{{ geo.country }} {{ geo.city }}</span>
+              {% if geo.asn %}
+                <span style="font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono);">
+                  ({{ geo.asn | replace('AS', '') | truncate(15, True) }})
+                </span>
+              {% endif %}
+            </span>
+          {% else %}
+            <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
+          {% endif %}
+        </td>
         <td>
           <span class="ip-tag-display" id="tag-display-{{ ip.id }}">
             {% if ip.tag %}

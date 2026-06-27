@@ -64,6 +64,15 @@ CREATE TABLE IF NOT EXISTS op_logs (
     success     INTEGER NOT NULL,
     created_at  TEXT DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS ip_geo_cache (
+    ip           TEXT PRIMARY KEY,
+    country      TEXT DEFAULT '',
+    country_code TEXT DEFAULT '',
+    city         TEXT DEFAULT '',
+    asn          TEXT DEFAULT '',
+    created_at   TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -399,3 +408,30 @@ async def get_op_logs(node_id: int | None = None, limit: int = 50) -> list[dict]
                 (limit,),
             )
         return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_cached_ip_geo(ip: str) -> dict | None:
+    """Get IP geo information from local cache database."""
+    async with _get_db() as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute(
+            "SELECT country, country_code, city, asn FROM ip_geo_cache WHERE ip = ?",
+            (ip,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return dict(row)
+    return None
+
+
+async def cache_ip_geo(ip: str, country: str, country_code: str, city: str, asn: str):
+    """Store IP geo information in the local cache database."""
+    async with _get_db() as db:
+        await db.execute(
+            """
+            INSERT OR REPLACE INTO ip_geo_cache (ip, country, country_code, city, asn, created_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+            """,
+            (ip, country, country_code, city, asn),
+        )
+        await db.commit()

@@ -37,6 +37,8 @@
       <thead>
         <tr>
           <th style="white-space: nowrap;">IP</th>
+          <th style="white-space: nowrap;">归属地</th>
+          <th style="white-space: nowrap;">网络/ASN</th>
           <th style="white-space: nowrap;">标签</th>
           <th style="white-space: nowrap;">目标端口</th>
           <th style="white-space: nowrap;">状态</th>
@@ -51,6 +53,26 @@
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
           <td class="mono" style="white-space: nowrap;">{{ c.ip }}</td>
+          <td style="white-space: nowrap;">
+            {% if ip_geos is defined and c.ip in ip_geos %}
+              {% set geo = ip_geos[c.ip] %}
+              <span style="font-size: 0.85rem;" title="{{ geo.country }} {{ geo.city }}">
+                {{ geo.flag }} {{ geo.country }} {{ geo.city }}
+              </span>
+            {% else %}
+              <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
+            {% endif %}
+          </td>
+          <td style="white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis;" 
+              title="{% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].asn }}{% endif %}">
+            {% if ip_geos is defined and c.ip in ip_geos %}
+              <span style="font-size: 0.78rem; color: var(--text-secondary);">
+                {{ ip_geos[c.ip].asn | replace('AS', '') }}
+              </span>
+            {% else %}
+              <span style="color: var(--text-muted); font-size: 0.8rem;">—</span>
+            {% endif %}
+          </td>
           <td>
             {% if c.ip != 'any' and c.ip != 'anywhere' and c.ip != 'Anywhere' %}
             <span class="ip-tag-badge-trigger" 

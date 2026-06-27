@@ -31,8 +31,8 @@ NODE_DIR = Path(__file__).parent.parent.parent / "node"
 # Geolocation & Regional Flags Helpers
 # ---------------------------------------------------------------------------
 
-def _sync_get_ip_country(host: str) -> tuple[str, str]:
-    """Blocking sync call to ip-api using urllib."""
+def _sync_get_ip_geo(host: str) -> tuple[str, str, str, str]:
+    """Blocking sync call to ip-api using urllib, returning (country, country_code, city, asn)."""
     url = f"http://ip-api.com/json/{host}"
     try:
         req = urllib.request.Request(
@@ -43,22 +43,85 @@ def _sync_get_ip_country(host: str) -> tuple[str, str]:
             if response.status == 200:
                 data = json.loads(response.read().decode('utf-8'))
                 if data.get("status") == "success":
-                    return data.get("country", "未知地区"), data.get("countryCode", "XX")
+                    country = data.get("country", "未知地区")
+                    country_code = data.get("countryCode", "XX")
+                    city = data.get("city", "")
+                    asn = data.get("as", "")  # e.g., "AS13335 Cloudflare, Inc."
+                    return country, country_code, city, asn
     except Exception:
         pass
-    return "未知地区", "XX"
+    return "未知地区", "XX", "", ""
+
+
+async def get_ip_geo_info(ip: str) -> dict:
+    """Get IP geo location and ASN info, hitting local cache database first."""
+    h = ip.strip()
+    if "/" in h:
+        h = h.split("/")[0]
+        
+    if h.lower() in ("localhost", "127.0.0.1", "::1", "any", "anywhere", "anywhere") or h.startswith("192.168.") or h.startswith("10.") or h.startswith("172.16."):
+        return {
+            "country": "局域网/回环",
+            "country_code": "CN",
+            "flag": "💻",
+            "city": "本地",
+            "asn": "Private IP"
+        }
+
+    # 1. Check database cache
+    try:
+        cached = await db.get_cached_ip_geo(h)
+        if cached:
+            return {
+                "country": cached.get("country") or "未知地区",
+                "country_code": cached.get("country_code") or "XX",
+                "flag": get_flag_emoji(cached.get("country_code")),
+                "city": cached.get("city") or "",
+                "asn": cached.get("asn") or "",
+            }
+    except Exception as e:
+        logger.error(f"Error fetching cached ip geo for {h}: {e}")
+
+    # 2. Call external API (concurrency protected by thread pool)
+    country, country_code, city, asn = await asyncio.to_thread(_sync_get_ip_geo, h)
+    
+    # 3. Store into database cache
+    try:
+        await db.cache_ip_geo(h, country, country_code, city, asn)
+    except Exception as e:
+        logger.error(f"Error caching ip geo for {h}: {e}")
+        
+    return {
+        "country": country,
+        "country_code": country_code,
+        "flag": get_flag_emoji(country_code),
+        "city": city,
+        "asn": asn
+    }
 
 
 async def get_ip_country(host: str) -> tuple[str, str]:
-    """Resolve IP or domain to country and country_code."""
-    h = host.strip()
-    # Check for private or loopback IP
-    if h in ("localhost", "127.0.0.1", "::1") or h.startswith("192.168.") or h.startswith("10.") or h.startswith("172.16."):
-        return "本地回环", "CN"
-    try:
-        return await asyncio.to_thread(_sync_get_ip_country, h)
-    except Exception:
-        return "未知地区", "XX"
+    """Resolve IP or domain to country and country_code. Maintained for backward compatibility."""
+    geo = await get_ip_geo_info(host)
+    return geo["country"], geo["country_code"]
+
+
+async def get_bulk_ip_geo(ips: list[str]) -> dict[str, dict]:
+    """Resolve a list of IPs concurrently with caching, returning a map of {ip: geo_dict}."""
+    valid_ips = []
+    for ip in set(ips):
+        if not ip:
+            continue
+        ip_strip = ip.strip()
+        if ip_strip.lower() in ("any", "anywhere", "all", "未知"):
+            continue
+        valid_ips.append(ip_strip)
+        
+    if not valid_ips:
+        return {}
+        
+    results = await asyncio.gather(*[get_ip_geo_info(ip) for ip in valid_ips])
+    return {ip: res for ip, res in zip(valid_ips, results)}
 
 
 def get_flag_emoji(country_code: str) -> str:
@@ -222,9 +285,19 @@ async def ip_manage_page(request: Request):
     """IP address management page (replaces legacy IP groups)."""
     ip_addresses = await db.get_all_ip_addresses()
     all_tags = await db.get_all_tags()
+    
+    # Get bulk IP geography details
+    ips = [ip["ip_cidr"] for ip in ip_addresses]
+    ip_geos = await get_bulk_ip_geo(ips)
+    
     return templates.TemplateResponse(
         "ip_groups.html",
-        {"request": request, "ip_addresses": ip_addresses, "all_tags": all_tags},
+        {
+            "request": request, 
+            "ip_addresses": ip_addresses, 
+            "all_tags": all_tags,
+            "ip_geos": ip_geos
+        },
     )
 
 
@@ -411,10 +484,18 @@ async def api_port_cards_grid(request: Request, node_id: int):
 
     # Get IP remarks for display
     ip_remarks = await db.get_ip_remarks_map()
+    all_ips = [r["ip"] for r in rules if r.get("ip")]
+    ip_geos = await get_bulk_ip_geo(all_ips)
 
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
-        {"request": request, "node": node, "port_data": port_data, "ip_remarks": ip_remarks},
+        {
+            "request": request, 
+            "node": node, 
+            "port_data": port_data, 
+            "ip_remarks": ip_remarks,
+            "ip_geos": ip_geos
+        },
     )
 
 
@@ -893,6 +974,22 @@ async def render_single_port_card(request: Request, node: dict, port: int, toast
 # API: IP Address Management (replaces legacy IP Group operations)
 # ---------------------------------------------------------------------------
 
+async def render_ip_address_list(request: Request, toast: dict | None = None):
+    """Helper to fetch all IP addresses with geocoding info and render the list partial."""
+    ip_addresses = await db.get_all_ip_addresses()
+    ips = [ip["ip_cidr"] for ip in ip_addresses]
+    ip_geos = await get_bulk_ip_geo(ips)
+    return templates.TemplateResponse(
+        "partials/ip_address_list.html",
+        {
+            "request": request, 
+            "ip_addresses": ip_addresses, 
+            "toast": toast, 
+            "ip_geos": ip_geos
+        },
+    )
+
+
 @app.post("/api/ip-addresses", response_class=HTMLResponse)
 async def api_create_ip_address(
     request: Request,
@@ -903,29 +1000,17 @@ async def api_create_ip_address(
     ip_cidr = ip_cidr.strip()
     tag = tag.strip()
     if not validate_ip_cidr(ip_cidr):
-        ip_addresses = await db.get_all_ip_addresses()
         toast = {"type": "error", "message": f"❌ 无效的 IP/CIDR 格式: {ip_cidr}"}
-        return templates.TemplateResponse(
-            "partials/ip_address_list.html",
-            {"request": request, "ip_addresses": ip_addresses, "toast": toast},
-        )
+        return await render_ip_address_list(request, toast)
 
     try:
         await db.upsert_ip_address(ip_cidr, tag, "manual")
     except Exception as exc:
-        ip_addresses = await db.get_all_ip_addresses()
         toast = {"type": "error", "message": f"❌ 添加失败: {exc}"}
-        return templates.TemplateResponse(
-            "partials/ip_address_list.html",
-            {"request": request, "ip_addresses": ip_addresses, "toast": toast},
-        )
+        return await render_ip_address_list(request, toast)
 
-    ip_addresses = await db.get_all_ip_addresses()
     toast = {"type": "success", "message": f"✅ IP {ip_cidr} 已添加" + (f"，标签: {tag}" if tag else "")}
-    return templates.TemplateResponse(
-        "partials/ip_address_list.html",
-        {"request": request, "ip_addresses": ip_addresses, "toast": toast},
-    )
+    return await render_ip_address_list(request, toast)
 
 
 @app.put("/api/ip-addresses/{ip_id}", response_class=HTMLResponse)
@@ -936,24 +1021,16 @@ async def api_update_ip_address(
 ):
     """Update an IP address tag."""
     await db.update_ip_address(ip_id, tag=tag.strip())
-    ip_addresses = await db.get_all_ip_addresses()
     toast = {"type": "success", "message": "✅ 标签已更新"}
-    return templates.TemplateResponse(
-        "partials/ip_address_list.html",
-        {"request": request, "ip_addresses": ip_addresses, "toast": toast},
-    )
+    return await render_ip_address_list(request, toast)
 
 
 @app.delete("/api/ip-addresses/{ip_id}", response_class=HTMLResponse)
 async def api_delete_ip_address(request: Request, ip_id: int):
     """Delete an IP address record."""
     await db.delete_ip_address(ip_id)
-    ip_addresses = await db.get_all_ip_addresses()
     toast = {"type": "success", "message": "✅ IP 地址已删除"}
-    return templates.TemplateResponse(
-        "partials/ip_address_list.html",
-        {"request": request, "ip_addresses": ip_addresses, "toast": toast},
-    )
+    return await render_ip_address_list(request, toast)
 
 
 @app.get("/partials/ip-tag-edit", response_class=HTMLResponse)
@@ -1571,6 +1648,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
         query_port = port
         
     result = await ssh.get_candidates(node, hours, query_port)
+    candidates = []
     if result.get("ok"):
         tz_offset = result.get("tz_offset", "+0000")
         candidates = result.get("candidates", [])
@@ -1580,6 +1658,10 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
                 c["last_seen"] = convert_to_taiwan_time(orig_seen, tz_offset)
         # Sort candidates by last_seen descending (newest first)
         candidates.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
+
+    # Get bulk IP geography details
+    candidate_ips = [c.get("ip") for c in candidates if c.get("ip")]
+    ip_geos = await get_bulk_ip_geo(candidate_ips)
 
     all_tags = await db.get_all_tags()
     ip_remarks = await db.get_ip_remarks_map()
@@ -1593,6 +1675,7 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
             "all_tags": all_tags,
             "current_port": port,
             "ip_remarks": ip_remarks,
+            "ip_geos": ip_geos,
         },
     )
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
