@@ -961,27 +961,28 @@ async def partial_ip_tag_edit(request: Request, ip: str):
     """Return inline edit input form for an IP tag, wrapped with check and cancel buttons."""
     remarks = await db.get_ip_remarks_map()
     current_tag = remarks.get(ip, "")
+    ip_safe = ip.replace(".", "_").replace("/", "_")
     
     html = f"""
     <div class="inline-edit-container" style="display: inline-flex; align-items: center; gap: 4px; vertical-align: middle;">
-        <form hx-put="/api/ip-addresses/inline-edit" 
-              hx-target="closest .inline-edit-container" 
-              hx-swap="outerHTML" 
-              style="display: inline-flex; align-items: center; gap: 4px; margin: 0; padding: 0;">
-            <input type="hidden" name="ip" value="{ip}">
-            <input type="text" name="tag" value="{current_tag}" 
-                   class="form-input"
-                   placeholder="标签"
-                   style="font-size: 0.68rem; height: 22px; width: 70px; padding: 1px 4px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 3px; outline: none; margin: 0;"
-                   hx-trigger="keyup[key=='Enter']"
-                   focus-me>
-            <!-- Save Button -->
-            <button type="submit" class="btn btn-primary" 
-                    style="height: 22px; width: 22px; padding: 0; min-height: unset; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; border-radius: 3px; background: var(--accent-purple); border: none; color: white;" 
-                    title="保存">
-                ✓
-            </button>
-        </form>
+        <input type="text" id="inline-tag-input-{ip_safe}" name="tag" value="{current_tag}" 
+               class="form-input"
+               placeholder="标签"
+               style="font-size: 0.68rem; height: 22px; width: 70px; padding: 1px 4px; background: var(--bg-primary); color: var(--text-primary); border: 1px solid var(--border-glass); border-radius: 3px; outline: none; margin: 0;"
+               onkeydown="if(event.key==='Enter') {{ document.getElementById('inline-tag-save-{ip_safe}').click(); }}"
+               focus-me>
+        <!-- Save Button -->
+        <button id="inline-tag-save-{ip_safe}"
+                hx-put="/api/ip-addresses/inline-edit" 
+                hx-include="#inline-tag-input-{ip_safe}"
+                hx-vals='{{"ip": "{ip}"}}'
+                hx-target="closest .inline-edit-container" 
+                hx-swap="outerHTML" 
+                class="btn btn-primary" 
+                style="height: 22px; width: 22px; padding: 0; min-height: unset; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem; border-radius: 3px; background: var(--accent-purple); border: none; color: white;" 
+                title="保存">
+            ✓
+        </button>
         <!-- Cancel Button -->
         <button hx-get="/api/ip-addresses/inline-cancel?ip={ip}&current_tag={current_tag}" 
                 hx-target="closest .inline-edit-container" 
