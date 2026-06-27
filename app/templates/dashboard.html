@@ -46,10 +46,6 @@
   {% else %}
   <p class="muted">还没有添加节点。</p>
   {% endif %}
-  <form method="post" action="/nodes/stub" class="visually-hidden" aria-hidden="true">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-    <button type="submit">CSRF 检查</button>
-  </form>
 </section>
 <section class="panel">
   <div class="section-title">

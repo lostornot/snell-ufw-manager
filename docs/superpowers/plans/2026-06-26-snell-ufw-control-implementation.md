@@ -23,7 +23,7 @@
 - `app/db.py`: SQLite engine/session setup and database initialization.
 - `app/models.py`: SQLAlchemy models.
 - `app/schemas.py`: Pydantic validation schemas.
-- `app/security.py`: admin-token login, sessions, CSRF helpers.
+- `app/security.py`: signed local sessions and CSRF helpers.
 - `app/locks.py`: per-node operation lock service.
 - `app/services/audit.py`: audit writing and secret redaction.
 - `app/services/nodes.py`: node CRUD, config profiles, status persistence.
@@ -31,7 +31,7 @@
 - `app/services/policies.py`: node policy resolution and UFW payload generation.
 - `app/services/ssh_executor.py`: OpenSSH subprocess runner.
 - `app/services/ufw_parser.py`: managed UFW comment parsing and normalization helpers.
-- `app/templates/`: Jinja2 templates for dashboard, login, nodes, profiles, relay groups, policies, audit logs.
+- `app/templates/`: Jinja2 templates for dashboard, nodes, profiles, relay groups, policies, audit logs.
 - `app/static/`: minimal CSS and HTMX vendor file if vendored.
 - `node/snell-fwctl`: restricted Python dispatcher.
 - `node/snellctl`: Snell install/config/status/service/log tooling.
@@ -66,7 +66,7 @@ pip install -e ".[dev]"
 
 Expected: editable install succeeds.
 
-- [ ] Implement `app/config.py` with defaults `HOST=127.0.0.1`, `PORT=8898`, `DATA_DIR=data`, `DATABASE_URL=sqlite:///data/snell-ufw-control.db`, `ADMIN_TOKEN`, and `SESSION_SECRET`.
+- [ ] Implement `app/config.py` with defaults `HOST=127.0.0.1`, `PORT=8898`, `DATA_DIR=data`, `DATABASE_URL=sqlite:///data/snell-ufw-control.db`, and `SESSION_SECRET`.
 
 - [ ] Implement `app/db.py` with `engine`, `SessionLocal`, `Base`, `get_db()`, and `init_db()`.
 
@@ -98,7 +98,6 @@ Expected: all M1 tests pass.
 - Create: `app/main.py`
 - Create: `app/security.py`
 - Create: `app/templates/base.html`
-- Create: `app/templates/login.html`
 - Create: `app/templates/dashboard.html`
 - Create: `app/templates/nodes/index.html`
 - Create: `app/templates/nodes/detail.html`
@@ -111,11 +110,10 @@ Expected: all M1 tests pass.
 
 - [ ] Implement FastAPI app setup with static files, Jinja2 templates, DB initialization hook, and routers grouped by UI area.
 
-- [ ] Implement admin-token login:
-  - GET `/login` renders a form;
-  - POST `/login` accepts `ADMIN_TOKEN`;
-  - successful login writes a signed session cookie;
-  - failed login writes an audit entry without storing submitted token text.
+- [ ] Implement local signed sessions:
+  - first local page visit writes a signed session cookie;
+  - no admin token or login page is exposed;
+  - cookies are signed with `SESSION_SECRET`.
 
 - [ ] Implement CSRF:
   - session contains a CSRF token;
@@ -126,14 +124,13 @@ Expected: all M1 tests pass.
 
 - [ ] Create read-only skeleton pages for dashboard, nodes, relay groups, policies, and audit logs.
 
-- [ ] Add state-changing stub buttons/forms with CSRF hidden inputs but no remote execution yet.
+- [ ] Add real state-changing forms with CSRF hidden inputs.
 
 - [ ] Write tests:
-  - unauthenticated dashboard redirects to login;
-  - valid token creates a session;
-  - invalid token is rejected;
+  - dashboard creates a local signed session cookie;
+  - `/login` is not exposed;
   - POST without CSRF is rejected;
-  - POST with CSRF reaches a stub handler.
+  - POST with CSRF reaches a real state-changing handler.
 
 - [ ] Run:
 
@@ -379,7 +376,7 @@ Expected: all M7 tests pass.
   - install Python dependencies;
   - create `data/` mode `700`;
   - create database file mode `600`;
-  - generate `ADMIN_TOKEN` and `SESSION_SECRET` when absent;
+  - generate `SESSION_SECRET` when absent;
   - install systemd service;
   - bind to `127.0.0.1:8898` by default.
 

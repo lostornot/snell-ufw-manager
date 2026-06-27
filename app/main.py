@@ -682,10 +682,6 @@ def create_app() -> FastAPI:
             context,
         )
 
-    @app.post("/nodes/stub", dependencies=[Depends(verify_csrf)])
-    def nodes_stub() -> PlainTextResponse:
-        return PlainTextResponse("stub ok")
-
     return app
 
 

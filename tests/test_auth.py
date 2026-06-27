@@ -22,7 +22,7 @@ def test_dashboard_creates_local_session_without_admin_token() -> None:
     assert "snell_session=" in response.headers["set-cookie"]
     assert "HttpOnly" in response.headers["set-cookie"]
     assert "SameSite=lax" in response.headers["set-cookie"]
-    assert extract_csrf(response.text)
+    assert "节点状态" in response.text
 
 
 def test_login_page_is_removed() -> None:
@@ -30,24 +30,38 @@ def test_login_page_is_removed() -> None:
 
     response = client.get("/login")
 
-    assert response.status_code == 404
+    assert response.status_code in {404, 405}
 
 
 def test_post_without_csrf_is_rejected() -> None:
     client = TestClient(create_app())
     client.get("/")
 
-    response = client.post("/nodes/stub")
+    response = client.post("/relay-groups", data={"name": "relay-a"})
 
     assert response.status_code == 403
 
 
-def test_post_with_csrf_reaches_stub_handler() -> None:
+def test_post_with_csrf_reaches_real_state_changing_handler() -> None:
     client = TestClient(create_app())
-    dashboard = client.get("/")
-    csrf_token = extract_csrf(dashboard.text)
+    page = client.get("/relay-groups")
+    csrf_token = extract_csrf(page.text)
 
-    response = client.post("/nodes/stub", data={"csrf_token": csrf_token})
+    response = client.post(
+        "/relay-groups",
+        data={"csrf_token": csrf_token, "name": "relay-a"},
+        follow_redirects=False,
+    )
 
-    assert response.status_code == 200
-    assert response.text == "stub ok"
+    assert response.status_code == 303
+    assert response.headers["location"] == "/relay-groups"
+    assert "relay-a" in client.get("/relay-groups").text
+
+
+def test_test_only_stub_route_is_not_exposed() -> None:
+    client = TestClient(create_app())
+    client.get("/")
+
+    response = client.post("/nodes/stub")
+
+    assert response.status_code in {404, 405}

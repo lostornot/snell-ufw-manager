@@ -26,7 +26,7 @@ Then open:
 http://127.0.0.1:8898
 ```
 
-The controller still requires an admin token, signed session cookie, and CSRF protection for state-changing requests.
+The controller creates a signed local session cookie automatically and requires CSRF protection for state-changing requests.
 
 ## Controller Install
 
@@ -61,6 +61,20 @@ snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/snell-fwctl
 ```
 
 The security boundary is the restricted command allowlist, root-owned tool files, JSON stdin validation, and no arbitrary shell support.
+
+To remove only the managed node-side tools and sudoers entry:
+
+```bash
+sudo scripts/uninstall-node.sh
+```
+
+To also remove the `snellmgr` user created by the node installer:
+
+```bash
+sudo REMOVE_USER=1 scripts/uninstall-node.sh
+```
+
+The uninstaller intentionally does not stop Snell, delete Snell config, or modify UFW rules.
 
 In the controller UI, adding a node only records its desired state and SSH connection information. For a new VPS, open the node detail page and use the `节点初始化` section:
 
