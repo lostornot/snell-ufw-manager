@@ -39,24 +39,7 @@
       </div>
     </div>
 
-    <!-- Access Log Candidate Analysis -->
-    <div class="glass-card" style="padding: 24px;">
-      <div class="section-header" style="margin-bottom: 16px;">
-        <h3 style="font-size: 1.2rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
-          <span>👁️</span> UFW 拦截候选 IP (最近 24 小时)
-        </h3>
-      </div>
-      <div id="access-log"
-           hx-get="/partials/nodes/{{ node.id }}/access-log"
-           hx-trigger="rules-updated from:body">
-        <div class="loading-overlay"
-             hx-get="/partials/nodes/{{ node.id }}/access-log"
-             hx-trigger="load"
-             hx-swap="outerHTML">
-          <span class="spinner"></span> 正在读取 UFW 安全拦截日志...
-        </div>
-      </div>
-    </div>
+
   </div>
 
   <!-- Right Column: Sidebar Sticky Form -->
@@ -177,6 +160,25 @@
     </div>
   </div>
 
+</div>
+
+<!-- Access Log Candidate Analysis -->
+<div class="glass-card" style="padding: 24px; margin-top: 24px; width: 100%;">
+  <div class="section-header" style="margin-bottom: 16px;">
+    <h3 style="font-size: 1.2rem; color: var(--text-primary); display: flex; align-items: center; gap: 6px;">
+      <span>👁️</span> UFW 拦截候选 IP (最近 24 小时)
+    </h3>
+  </div>
+  <div id="access-log"
+       hx-get="/partials/nodes/{{ node.id }}/access-log"
+       hx-trigger="rules-updated from:body">
+    <div class="loading-overlay"
+         hx-get="/partials/nodes/{{ node.id }}/access-log"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+      <span class="spinner"></span> 正在读取 UFW 安全拦截日志...
+    </div>
+  </div>
 </div>
 
 {% block scripts %}

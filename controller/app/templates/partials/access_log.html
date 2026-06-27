@@ -36,13 +36,18 @@
     <table>
       <thead>
         <tr>
-          <th style="white-space: nowrap;">IP / 归属网络</th>
+          <th style="white-space: nowrap;">IP</th>
+          <th style="white-space: nowrap; text-align: center;">国旗</th>
+          <th style="white-space: nowrap;">归属国家 / 地区</th>
+          <th style="white-space: nowrap;">城市</th>
+          <th style="white-space: nowrap;">ASN 编码</th>
+          <th style="white-space: nowrap;">网络运营商</th>
           <th style="white-space: nowrap;">标签</th>
           <th style="white-space: nowrap;">目标端口</th>
           <th style="white-space: nowrap;">状态</th>
-          <th style="white-space: nowrap;">次数</th>
+          <th style="white-space: nowrap; text-align: right;">次数</th>
           <th style="white-space: nowrap;">最近时间 (台湾时区)</th>
-          <th style="white-space: nowrap;">操作</th>
+          <th style="white-space: nowrap; text-align: right;">操作</th>
         </tr>
       </thead>
       <tbody>
@@ -50,42 +55,37 @@
         {% set rule_port = c.port | default(node.snell_port) %}
         {% set in_whitelist = c.ip in allowed_set %}
         <tr>
-          <td style="white-space: nowrap; padding: 10px 12px; vertical-align: middle;">
-            <div style="display: flex; flex-direction: column; gap: 4px; justify-content: center; min-height: 50px; white-space: nowrap;">
-              <!-- Line 1: IP Address -->
-              <span class="mono" style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary); line-height: 1.1;">{{ c.ip }}</span>
-              {% if ip_geos is defined and c.ip in ip_geos %}
-                {% set geo = ip_geos[c.ip] %}
-                <!-- Line 2: Country -->
-                <div style="font-size: 0.72rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; line-height: 1.1; opacity: 0.92;">
-                  <span>{{ geo.flag }}</span>
-                  <span style="font-weight: 600;">{{ geo.country }}</span>
-                </div>
-                <!-- Line 3: City (if exists) -->
-                {% if geo.city %}
-                <div style="font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px; line-height: 1.1; margin-left: 2px;">
-                  <span>📍</span>
-                  <span>{{ geo.city }}</span>
-                </div>
-                {% endif %}
-                <!-- Line 4: ASN Code -->
-                {% if geo.asn_code %}
-                <div style="font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono); display: flex; align-items: center; gap: 4px; line-height: 1.1; margin-left: 2px;">
-                  <span>🔢</span>
-                  <span>{{ geo.asn_code }}</span>
-                </div>
-                {% endif %}
-                <!-- Line 5: Network Provider Org -->
-                {% if geo.asn_org %}
-                <div style="font-size: 0.65rem; color: var(--text-secondary); opacity: 0.8; display: flex; align-items: center; gap: 4px; line-height: 1.1; margin-left: 2px; max-width: 180px; overflow: hidden; text-overflow: ellipsis;" title="{{ geo.asn_org }}">
-                  <span>🏢</span>
-                  <span>{{ geo.asn_org }}</span>
-                </div>
-                {% endif %}
-              {% endif %}
-            </div>
+          <!-- 1. IP -->
+          <td class="mono" style="white-space: nowrap; font-weight: 600; vertical-align: middle; padding: 10px 12px;">{{ c.ip }}</td>
+          
+          <!-- 2. Flag -->
+          <td style="white-space: nowrap; text-align: center; font-size: 1.15rem; vertical-align: middle; padding: 10px 12px;">
+            {% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].flag }}{% else %}🌐{% endif %}
           </td>
-          <td>
+          
+          <!-- 3. Country -->
+          <td style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">
+            {% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].country }}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+          </td>
+          
+          <!-- 4. City -->
+          <td style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">
+            {% if ip_geos is defined and c.ip in ip_geos and ip_geos[c.ip].city %}{{ ip_geos[c.ip].city }}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+          </td>
+          
+          <!-- 5. ASN -->
+          <td class="mono" style="white-space: nowrap; font-size: 0.8rem; color: var(--text-muted); vertical-align: middle; padding: 10px 12px;">
+            {% if ip_geos is defined and c.ip in ip_geos and ip_geos[c.ip].asn_code %}{{ ip_geos[c.ip].asn_code }}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+          </td>
+          
+          <!-- 6. Org -->
+          <td style="white-space: nowrap; font-size: 0.82rem; color: var(--text-secondary); max-width: 220px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; padding: 10px 12px;"
+              title="{% if ip_geos is defined and c.ip in ip_geos %}{{ ip_geos[c.ip].asn_org }}{% endif %}">
+            {% if ip_geos is defined and c.ip in ip_geos and ip_geos[c.ip].asn_org %}{{ ip_geos[c.ip].asn_org }}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+          </td>
+          
+          <!-- 7. Tag (Editable inline) -->
+          <td style="vertical-align: middle; padding: 10px 12px;">
             {% if c.ip != 'any' and c.ip != 'anywhere' and c.ip != 'Anywhere' %}
             <span class="ip-tag-badge-trigger" 
                   hx-get="/partials/ip-tag-edit?ip={{ c.ip }}" 
@@ -104,34 +104,43 @@
             <span style="color: var(--text-muted); font-style: italic; font-size: 0.8rem;">—</span>
             {% endif %}
           </td>
-          <td class="mono" style="white-space: nowrap;">
+          
+          <!-- 8. Target Port -->
+          <td class="mono" style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">
             <span class="tag tag-info" style="font-size:0.8rem; padding:2px 6px; border-radius:4px;">
               {{ rule_port }}
             </span>
           </td>
-          <td style="white-space: nowrap;">
+          
+          <!-- 9. Status -->
+          <td style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">
             {% if c.action == "ALLOW" %}
               <span class="tag tag-allow" style="white-space: nowrap;">✅ 允许</span>
             {% else %}
               <span class="tag tag-block" style="white-space: nowrap;">❌ 拦截</span>
             {% endif %}
           </td>
-          <td style="white-space: nowrap;">{{ c.count }}</td>
-          <td class="text-secondary text-sm" style="white-space: nowrap;">{{ c.last_seen }}</td>
-          <td style="white-space: nowrap;">
+          
+          <!-- 10. Count -->
+          <td style="white-space: nowrap; text-align: right; font-weight: 500; padding: 10px 12px; vertical-align: middle;">{{ c.count }}</td>
+          
+          <!-- 11. Last Seen -->
+          <td class="text-secondary text-sm" style="white-space: nowrap; vertical-align: middle; padding: 10px 12px;">{{ c.last_seen }}</td>
+          
+          <!-- 12. Actions -->
+          <td style="white-space: nowrap; text-align: right; padding: 10px 12px; vertical-align: middle;">
             {% if not in_whitelist %}
-            <!-- Action 1: Whitelist directly on this target port -->
             <button hx-post="/api/nodes/{{ node.id }}/ports/{{ rule_port }}/ips"
                     hx-vals='{"ip_cidr": "{{ c.ip }}"}'
                     hx-target="#port-card-{{ rule_port }}"
                     hx-swap="outerHTML"
                     class="btn btn-secondary btn-sm"
-                    style="white-space: nowrap;height:28px;padding:2px 8px;font-weight:600;font-size:0.75rem;"
+                    style="white-space: nowrap; height: 28px; padding: 2px 8px; font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center;"
                     title="直接放行此 IP 到主机的端口 {{ rule_port }}">
-              直接放行
+              放行
             </button>
             {% else %}
-            <span class="text-secondary text-sm" style="white-space: nowrap;">已在白名单</span>
+            <span class="text-secondary text-sm" style="white-space: nowrap; opacity: 0.7;">已放行</span>
             {% endif %}
           </td>
         </tr>
