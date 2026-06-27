@@ -35,8 +35,20 @@
               {{ rule.ip }}
             {% endif %}
           </span>
-          {% if ip_remarks is defined and rule.ip in ip_remarks %}
-          <span class="ip-tag-label" style="font-size: 0.68rem; color: var(--text-muted); font-weight: 500; background: rgba(139, 92, 246, 0.08); padding: 1px 5px; border-radius: 3px; white-space: nowrap;">{{ ip_remarks[rule.ip] }}</span>
+          {% if rule.ip != 'any' and rule.ip != 'anywhere' and rule.ip != 'Anywhere' %}
+          <span class="ip-tag-badge-trigger" 
+                hx-get="/partials/ip-tag-edit?ip={{ rule.ip }}" 
+                hx-trigger="click" 
+                hx-target="this" 
+                hx-swap="outerHTML"
+                style="cursor: pointer; font-size: 0.68rem; padding: 1px 5px; border-radius: 3px; white-space: nowrap; background: rgba(139, 92, 246, 0.06); color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px;"
+                title="点击编辑标签">
+            {% if ip_remarks is defined and rule.ip in ip_remarks and ip_remarks[rule.ip] %}
+              {{ ip_remarks[rule.ip] }}
+            {% else %}
+              <span style="border: 1px dashed rgba(15, 23, 42, 0.15); color: var(--text-muted); padding: 0 3px;">+ 标签</span>
+            {% endif %}
+          </span>
           {% endif %}
           <span class="ip-proto" style="font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase;">{{ rule.proto }}</span>
           <button class="btn-remove-ip"
