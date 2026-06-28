@@ -52,7 +52,7 @@
       <tbody>
         {% for c in candidates %}
         {% set rule_port = c.port | default(node.snell_port) %}
-        {% set in_whitelist = c.ip in allowed_set %}
+        {% set in_whitelist = c.in_whitelist %}
         <tr>
           <!-- 1. IP -->
           <td class="mono" style="white-space: nowrap; font-weight: 600; vertical-align: middle; padding: 10px 12px;">{{ c.ip }}</td>

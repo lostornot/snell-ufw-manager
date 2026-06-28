@@ -27,6 +27,43 @@ STATIC_DIR = APP_DIR / "static"
 NODE_DIR = Path(__file__).parent.parent.parent / "node"
 
 
+def is_ip_whitelisted(ip_str: str, port_str: str, active_rules: list[tuple[str, str]]) -> bool:
+    """Check if the given IP address is whitelisted for the specific port (supports CIDR)."""
+    ip_str = ip_str.strip()
+    if not ip_str:
+        return False
+    if ip_str.lower() in ("any", "anywhere", "all"):
+        return True
+        
+    try:
+        ip_obj = ipaddress.IPv4Address(ip_str)
+    except ValueError:
+        return False
+        
+    for rule_ip, rule_port in active_rules:
+        if str(rule_port) != str(port_str):
+            continue
+            
+        rule_ip_clean = rule_ip.lower().strip()
+        if rule_ip_clean in ("any", "anywhere", "all"):
+            return True
+            
+        try:
+            if "/" in rule_ip_clean:
+                network = ipaddress.IPv4Network(rule_ip_clean, strict=False)
+                if ip_obj in network:
+                    return True
+            else:
+                if ip_obj == ipaddress.IPv4Address(rule_ip_clean):
+                    return True
+        except ValueError:
+            # If parsing fails for a specific rule, just check string equality
+            if rule_ip_clean == ip_str.lower():
+                return True
+                
+    return False
+
+
 def clean_isp_name(isp: str) -> str:
     """Clean and translate raw ISP names to reader-friendly Chinese descriptions."""
     if not isp:
@@ -1802,14 +1839,14 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
         
     # Fetch live whitelist to see allowed IPs and extract all allowed ports
     wl_result = await ssh.get_whitelist(node)
-    allowed_set = set()
+    active_rules = []
     open_ports = set()
     if wl_result.get("ok"):
         for r in wl_result.get("rules", []):
-            if str(r.get("port")) == str(node["snell_port"]):
-                allowed_set.add(r.get("ip"))
+            ip_val = r.get("ip")
             p_val = r.get("port")
-            if p_val:
+            if ip_val and p_val:
+                active_rules.append((ip_val.strip(), str(p_val)))
                 open_ports.add(str(p_val))
                 
     # Fallback to SNELL and SSH ports if no whitelist could be loaded
@@ -1833,6 +1870,11 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
             orig_seen = c.get("last_seen", "")
             if orig_seen:
                 c["last_seen"] = convert_to_taiwan_time(orig_seen, tz_offset)
+            
+            # Precompute whitelist status for this candidate IP on its target port
+            rule_port = str(c.get("port") or node["snell_port"])
+            c["in_whitelist"] = is_ip_whitelisted(c.get("ip", ""), rule_port, active_rules)
+            
         # Sort candidates by last_seen descending (newest first)
         candidates.sort(key=lambda x: x.get("last_seen", ""), reverse=True)
 
@@ -1848,7 +1890,6 @@ async def partial_access_log(request: Request, node_id: int, hours: int = 24, po
             "request": request,
             "node": node,
             "result": result,
-            "allowed_set": allowed_set,
             "all_tags": all_tags,
             "current_port": port,
             "ip_remarks": ip_remarks,
