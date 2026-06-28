@@ -6,8 +6,10 @@ import sys
 
 # 确保能导入同级 database 模块
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import pytest
 from database import init_db, get_db_path
 
+@pytest.mark.asyncio
 async def test_migration():
     temp_db = tempfile.mktemp(suffix=".db")
     # 临时覆盖全局 SNELL_DB 环境变量以进行测试隔离

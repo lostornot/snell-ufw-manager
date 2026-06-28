@@ -4,9 +4,22 @@
 {% block title %}IP 地址管理 — VPS UFW Firewall Manager{% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <h1 class="page-title">IP 地址管理</h1>
-  <p class="page-subtitle">管理所有已注册的 IP 地址及其标签。相同标签的 IP 在防火墙部署时可作为一组批量放行。</p>
+<div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+  <div>
+    <h1 class="page-title" style="margin: 0;">IP 地址管理</h1>
+    <p class="page-subtitle" style="margin: 4px 0 0 0;">管理所有已注册的 IP 地址及其标签。相同标签的 IP 在防火墙部署时可作为一组批量放行。</p>
+  </div>
+  <div>
+    <button class="btn btn-secondary"
+            hx-post="/api/ip-addresses/update-cn"
+            hx-target="#ip-address-list"
+            hx-swap="outerHTML"
+            hx-indicator="#update-cn-spinner"
+            style="display: inline-flex; align-items: center; justify-content: center; height: 38px; gap: 8px;">
+      <span class="spinner htmx-indicator" id="update-cn-spinner" style="margin: 0;"></span>
+      更新中国 IP 库
+    </button>
+  </div>
 </div>
 
 {# ── 新增 IP 地址 ── #}
