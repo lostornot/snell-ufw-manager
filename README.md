@@ -1,6 +1,6 @@
-# Snell VPS Firewall Manager (v0.2 / nftables-only)
+# Multi-VPS Firewall Manager (v0.2 / nftables-only)
 
-集中管理多台 VPS 上 Snell 代理服务及 SSH 的防火墙入站策略，提供基于 nftables 的原子化服务策略下发、安全防锁死自动回滚以及环境风险感知。
+集中管理多台 VPS 上各个代理服务及 SSH 的防火墙入站策略，提供基于 nftables 的原子化服务策略下发、安全防锁死自动回滚以及环境风险感知。
 
 ---
 
@@ -38,13 +38,13 @@
 
 ```bash
 # 上传到控制中心 VPS
-scp -r snell-vps-firewall-manager/ root@控制中心VPS:/opt/
+scp -r multi-vps-firewall-manager/ root@控制中心VPS:/opt/
 
 # SSH 到控制中心 VPS
 ssh root@控制中心VPS
 
 # 一键安装
-bash /opt/snell-vps-firewall-manager/controller/install.sh
+bash /opt/multi-vps-firewall-manager/controller/install.sh
 ```
 
 ### 2. 访问面板
@@ -87,7 +87,7 @@ ssh -L 8899:127.0.0.1:8899 root@控制中心VPS
 ## 目录结构
 
 ```
-snell-vps-firewall-manager/
+multi-vps-firewall-manager/
 ├── controller/          # 控制中心
 │   ├── app/
 │   │   ├── main.py      # FastAPI 路由与核心逻辑
