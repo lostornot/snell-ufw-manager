@@ -1489,6 +1489,56 @@ async def api_quick_add(
     return resp
 
 
+@app.post("/api/ip-addresses/update-cn", response_class=HTMLResponse)
+async def api_update_cn_ips(request: Request):
+    """Fetch latest China IPv4 blocks and update local database's cn_ips tag."""
+    import httpx
+    
+    urls = [
+        "https://raw.githubusercontent.com/herrbischoff/country-ip-blocks/master/ipv4/cn.zone",
+        "https://fastly.jsdelivr.net/gh/herrbischoff/country-ip-blocks@master/ipv4/cn.zone",
+        "https://cdn.jsdelivr.net/gh/herrbischoff/country-ip-blocks@master/ipv4/cn.zone"
+    ]
+    
+    content = ""
+    error_msg = ""
+    
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for url in urls:
+            try:
+                response = await client.get(url)
+                if response.status_code == 200:
+                    content = response.text
+                    break
+            except Exception as exc:
+                error_msg = str(exc)
+                continue
+                
+    if not content:
+        toast = {"type": "error", "message": f"❌ 无法下载中国 IP 数据库，错误: {error_msg}"}
+        return await render_ip_address_list(request, toast)
+        
+    # Parse CIDR lines
+    cidrs = []
+    for line in content.splitlines():
+        line = line.strip()
+        if line and not line.startswith("#"):
+            cidrs.append(line)
+            
+    if not cidrs:
+        toast = {"type": "error", "message": "❌ 解析 IP 数据库发现数据为空"}
+        return await render_ip_address_list(request, toast)
+        
+    try:
+        # Commit to DB
+        await db.batch_reset_cn_ips(cidrs)
+        toast = {"type": "success", "message": f"✅ 中国 IP 库已成功更新（共收录 {len(cidrs)} 条 CIDR 段）！"}
+    except Exception as exc:
+        toast = {"type": "error", "message": f"❌ 数据库写入失败: {exc}"}
+        
+    return await render_ip_address_list(request, toast)
+
+
 if __name__ == "__main__":
     import uvicorn
 

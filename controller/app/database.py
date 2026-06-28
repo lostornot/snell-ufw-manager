@@ -549,3 +549,18 @@ async def update_node_policy_status(node_id: int, policy_id: int, status: str, e
             (status, error_msg, node_id, policy_id)
         )
         await db.commit()
+
+async def batch_reset_cn_ips(cidr_list: list[str]) -> None:
+    """Clear all records with tag 'cn_ips' and insert the new list inside a transaction."""
+    async with _get_db() as db:
+        # Delete old
+        await db.execute("DELETE FROM ip_addresses WHERE tag = 'cn_ips'")
+        
+        # Batch Insert
+        params = [(cidr, "cn_ips", "cn_zone") for cidr in cidr_list]
+        await db.executemany(
+            """INSERT INTO ip_addresses (ip_cidr, tag, source)
+               VALUES (?, ?, ?)""",
+            params
+        )
+        await db.commit()
