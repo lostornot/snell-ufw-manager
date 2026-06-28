@@ -5,28 +5,36 @@ import os
 from pathlib import Path
 import aiosqlite
 
-DB_PATH = os.environ.get(
-    "SNELL_DB",
-    str(Path(__file__).parent.parent / "data" / "snell_manager.db"),
-)
+def get_db_path() -> str:
+    return os.environ.get(
+        "SNELL_DB",
+        str(Path(__file__).parent.parent / "data" / "snell_manager.db"),
+    )
 
 logger = logging.getLogger(__name__)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS nodes (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    name        TEXT NOT NULL,
-    host        TEXT NOT NULL,
-    ssh_port    INTEGER DEFAULT 22,
-    ssh_user    TEXT DEFAULT 'snellmgr',
-    snell_port  INTEGER NOT NULL,
-    snell_conf  TEXT DEFAULT '/root/snelldocker/snell-conf/snell.conf',
-    remark      TEXT DEFAULT '',
-    enabled     INTEGER DEFAULT 1,
-    country     TEXT DEFAULT '',
-    country_code TEXT DEFAULT '',
-    tags        TEXT DEFAULT '',
-    created_at  TEXT DEFAULT (datetime('now'))
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    host            TEXT NOT NULL,
+    ssh_port        INTEGER DEFAULT 22,
+    ssh_user        TEXT DEFAULT 'snellmgr',
+    snell_port      INTEGER NOT NULL,
+    snell_conf      TEXT DEFAULT '/root/snelldocker/snell-conf/snell.conf',
+    remark          TEXT DEFAULT '',
+    enabled         INTEGER DEFAULT 1,
+    country         TEXT DEFAULT '',
+    country_code    TEXT DEFAULT '',
+    tags            TEXT DEFAULT '',
+    firewall_backend TEXT DEFAULT 'nftables',
+    role            TEXT DEFAULT '',
+    tailscale_ip    TEXT DEFAULT '',
+    docker_detected INTEGER DEFAULT 0,
+    docker_risk     TEXT DEFAULT '',
+    nftables_active INTEGER DEFAULT 0,
+    last_checked_at TEXT DEFAULT '',
+    created_at      TEXT DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS ip_groups (
@@ -50,8 +58,36 @@ CREATE TABLE IF NOT EXISTS ip_addresses (
     ip_cidr     TEXT NOT NULL UNIQUE,
     tag         TEXT DEFAULT '',
     source      TEXT DEFAULT 'manual',
+    set_name    TEXT DEFAULT '',
+    label       TEXT DEFAULT '',
+    expires_at  TEXT DEFAULT '',
+    enabled     INTEGER DEFAULT 1,
     created_at  TEXT DEFAULT (datetime('now')),
     updated_at  TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS policies (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    service         TEXT NOT NULL,
+    port            INTEGER NOT NULL,
+    protocol        TEXT NOT NULL,
+    allow_sets      TEXT NOT NULL,
+    default_action  TEXT DEFAULT 'drop',
+    enabled         INTEGER DEFAULT 1,
+    created_at      TEXT DEFAULT (datetime('now')),
+    updated_at      TEXT DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS node_policies (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    node_id             INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+    policy_id           INTEGER NOT NULL REFERENCES policies(id) ON DELETE CASCADE,
+    enabled             INTEGER DEFAULT 1,
+    last_applied_at     TEXT DEFAULT '',
+    last_apply_status   TEXT DEFAULT '',
+    last_error          TEXT DEFAULT '',
+    UNIQUE(node_id, policy_id)
 );
 
 CREATE TABLE IF NOT EXISTS op_logs (
@@ -78,8 +114,9 @@ CREATE TABLE IF NOT EXISTS ip_geo_cache (
 
 async def init_db():
     """Initialize the database and create tables."""
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    async with aiosqlite.connect(DB_PATH) as db:
+    db_path = get_db_path()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    async with aiosqlite.connect(db_path) as db:
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
         await db.executescript(SCHEMA)
@@ -87,12 +124,42 @@ async def init_db():
         # Dynamic schema upgrades for nodes table
         cursor = await db.execute("PRAGMA table_info(nodes)")
         cols = [row[1] for row in await cursor.fetchall()]
+        
+        # Older columns
         if "country" not in cols:
             await db.execute("ALTER TABLE nodes ADD COLUMN country TEXT DEFAULT ''")
         if "country_code" not in cols:
             await db.execute("ALTER TABLE nodes ADD COLUMN country_code TEXT DEFAULT ''")
         if "tags" not in cols:
             await db.execute("ALTER TABLE nodes ADD COLUMN tags TEXT DEFAULT ''")
+            
+        # New columns for nftables/docker detection
+        if "firewall_backend" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN firewall_backend TEXT DEFAULT 'nftables'")
+        if "role" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN role TEXT DEFAULT ''")
+        if "tailscale_ip" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN tailscale_ip TEXT DEFAULT ''")
+        if "docker_detected" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN docker_detected INTEGER DEFAULT 0")
+        if "docker_risk" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN docker_risk TEXT DEFAULT ''")
+        if "nftables_active" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN nftables_active INTEGER DEFAULT 0")
+        if "last_checked_at" not in cols:
+            await db.execute("ALTER TABLE nodes ADD COLUMN last_checked_at TEXT DEFAULT ''")
+
+        # Dynamic schema upgrades for ip_addresses table
+        cursor = await db.execute("PRAGMA table_info(ip_addresses)")
+        ip_cols = [row[1] for row in await cursor.fetchall()]
+        if "set_name" not in ip_cols:
+            await db.execute("ALTER TABLE ip_addresses ADD COLUMN set_name TEXT DEFAULT ''")
+        if "label" not in ip_cols:
+            await db.execute("ALTER TABLE ip_addresses ADD COLUMN label TEXT DEFAULT ''")
+        if "expires_at" not in ip_cols:
+            await db.execute("ALTER TABLE ip_addresses ADD COLUMN expires_at TEXT DEFAULT ''")
+        if "enabled" not in ip_cols:
+            await db.execute("ALTER TABLE ip_addresses ADD COLUMN enabled INTEGER DEFAULT 1")
 
         # --- Migrate legacy ip_groups + ip_group_items → ip_addresses ---
         try:
@@ -132,7 +199,7 @@ async def init_db():
 
 def _get_db():
     """Get a database connection (caller must use as async context manager)."""
-    return aiosqlite.connect(DB_PATH)
+    return aiosqlite.connect(get_db_path())
 
 
 # ---------------------------------------------------------------------------
