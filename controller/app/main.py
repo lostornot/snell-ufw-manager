@@ -57,7 +57,20 @@ def clean_isp_name(isp: str) -> str:
 
 def _sync_get_ip_geo(host: str) -> tuple[str, str, str, str]:
     """Blocking sync call to ip-api using urllib, returning (country, country_code, city, asn)."""
-    url = f"http://ip-api.com/json/{host}?lang=zh-CN"
+    # 智能转换网段地址，如 1.2.3.0 -> 1.2.3.1
+    h = host.strip()
+    if h.endswith(".0"):
+        parts = h.split(".")
+        if len(parts) == 4:
+            if parts[2] == "0" and parts[3] == "0":
+                parts[2] = "1"
+                parts[3] = "1"
+            elif parts[3] == "0":
+                parts[3] = "1"
+            h = ".".join(parts)
+
+    # 1. 尝试主接口: ip-api.com
+    url = f"http://ip-api.com/json/{h}?lang=zh-CN"
     try:
         req = urllib.request.Request(
             url, 
@@ -90,8 +103,62 @@ def _sync_get_ip_geo(host: str) -> tuple[str, str, str, str]:
                         asn = as_field
                         
                     return country, country_code, city, asn
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Primary Geo API (ip-api) failed for {h}: {e}")
+
+    # 2. 尝试备用接口: api.ip.sb (回退)
+    url_sb = f"https://api.ip.sb/geoip/{h}"
+    try:
+        req = urllib.request.Request(
+            url_sb, 
+            headers={'User-Agent': 'Mozilla/5.0'}
+        )
+        with urllib.request.urlopen(req, timeout=3.0) as response:
+            if response.status == 200:
+                data = json.loads(response.read().decode('utf-8'))
+                country = data.get("country", "未知地区")
+                country_code = data.get("country_code", "XX")
+                city = data.get("city", "")
+                
+                # 翻译国家名称 (因为 ip.sb 只返回英文国家名)
+                country_lower = country.lower()
+                if country_lower == "china":
+                    country = "中国"
+                elif country_lower == "hong kong":
+                    country = "中国香港"
+                elif country_lower == "macao":
+                    country = "中国澳门"
+                elif country_lower == "taiwan":
+                    country = "中国台湾"
+                elif country_lower == "united states":
+                    country = "美国"
+                elif country_lower == "japan":
+                    country = "日本"
+                elif country_lower == "singapore":
+                    country = "新加坡"
+                elif country_lower == "united kingdom":
+                    country = "英国"
+                elif country_lower == "germany":
+                    country = "德国"
+                elif country_lower == "south korea":
+                    country = "韩国"
+
+                isp_field = data.get("isp") or data.get("organization") or ""
+                as_num = data.get("asn", "")
+                as_code = f"AS{as_num}" if as_num else ""
+                clean_isp = clean_isp_name(isp_field)
+                
+                if as_code and clean_isp:
+                    asn = f"{as_code} {clean_isp}"
+                elif clean_isp:
+                    asn = clean_isp
+                else:
+                    asn = f"{as_code}"
+                    
+                return country, country_code, city, asn
+    except Exception as e:
+        logger.warning(f"Fallback Geo API (ip.sb) failed for {h}: {e}")
+
     return "未知地区", "XX", "", ""
 
 
