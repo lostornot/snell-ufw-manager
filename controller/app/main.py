@@ -124,9 +124,34 @@ async def get_ip_geo_info(ip: str) -> dict:
                 parts = asn_full.split(" ", 1)
                 asn_code = parts[0]
                 if len(parts) > 1:
-                    asn_org = parts[1]
+                    asn_org = clean_isp_name(parts[1])
+            
+            # Simple country translation for backward compatibility with old cache
+            country_name = cached.get("country") or ""
+            country_lower = country_name.lower()
+            if country_lower == "china":
+                country_name = "中国"
+            elif country_lower == "hong kong":
+                country_name = "中国香港"
+            elif country_lower == "macao":
+                country_name = "中国澳门"
+            elif country_lower == "taiwan":
+                country_name = "中国台湾"
+            elif country_lower == "united states":
+                country_name = "美国"
+            elif country_lower == "japan":
+                country_name = "日本"
+            elif country_lower == "singapore":
+                country_name = "新加坡"
+            elif country_lower == "united kingdom":
+                country_name = "英国"
+            elif country_lower == "germany":
+                country_name = "德国"
+            elif country_lower == "south korea":
+                country_name = "韩国"
+                
             return {
-                "country": cached.get("country"),
+                "country": country_name,
                 "country_code": cached.get("country_code"),
                 "flag": get_flag_emoji(cached.get("country_code")),
                 "city": cached.get("city") or "",
