@@ -28,15 +28,19 @@ NODE_DIR = Path(__file__).parent.parent.parent / "node"
 
 
 def is_ip_whitelisted(ip_str: str, port_str: str, active_rules: list[tuple[str, str]]) -> bool:
-    """Check if the given IP address is whitelisted for the specific port (supports CIDR)."""
+    """Check if the given IP address is whitelisted for the specific port (supports IPv4/IPv6 and CIDR)."""
     ip_str = ip_str.strip()
     if not ip_str:
         return False
     if ip_str.lower() in ("any", "anywhere", "all"):
         return True
         
+    # Clean IPv4-mapped IPv6 address (e.g. ::ffff:1.2.3.4 -> 1.2.3.4)
+    if ip_str.startswith("::ffff:"):
+        ip_str = ip_str.replace("::ffff:", "")
+        
     try:
-        ip_obj = ipaddress.IPv4Address(ip_str)
+        ip_obj = ipaddress.ip_address(ip_str)
     except ValueError:
         return False
         
@@ -48,16 +52,22 @@ def is_ip_whitelisted(ip_str: str, port_str: str, active_rules: list[tuple[str, 
         if rule_ip_clean in ("any", "anywhere", "all"):
             return True
             
+        # Clean IPv4-mapped IPv6 in rules as well
+        if rule_ip_clean.startswith("::ffff:"):
+            rule_ip_clean = rule_ip_clean.replace("::ffff:", "")
+            
         try:
             if "/" in rule_ip_clean:
-                network = ipaddress.IPv4Network(rule_ip_clean, strict=False)
-                if ip_obj in network:
+                network = ipaddress.ip_network(rule_ip_clean, strict=False)
+                # Check if IP address family matches network family before checking containment
+                if ip_obj.version == network.version and ip_obj in network:
                     return True
             else:
-                if ip_obj == ipaddress.IPv4Address(rule_ip_clean):
+                rule_ip_obj = ipaddress.ip_address(rule_ip_clean)
+                if ip_obj == rule_ip_obj:
                     return True
         except ValueError:
-            # If parsing fails for a specific rule, just check string equality
+            # Fall back to string comparison
             if rule_ip_clean == ip_str.lower():
                 return True
                 
