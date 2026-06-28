@@ -1,5 +1,5 @@
 <div class="glass-card" id="node-header-card" 
-     style="position: sticky; top: 16px; z-index: 999; margin-bottom: 32px; padding: 16px 24px; background: var(--bg-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-card); border: 1px solid var(--border-glass);">
+     style="margin-bottom: 32px; padding: 16px 24px; background: var(--bg-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); box-shadow: var(--shadow-card); border: 1px solid var(--border-glass);">
   <form hx-put="/api/nodes/{{ node.id }}/header"
         hx-target="#node-header-card"
         hx-swap="outerHTML"
