@@ -13,9 +13,9 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-import database as db
-from config import load_config
-from ssh_executor import SSHExecutor
+from app import database as db
+from app.config import load_config
+from app.ssh_executor import SSHExecutor
 
 logger = logging.getLogger(__name__)
 config = load_config()

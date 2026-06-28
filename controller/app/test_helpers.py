@@ -4,7 +4,7 @@ import os
 
 # Ensure we can import main from app folder
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from main import validate_ip_cidr
+from app.main import validate_ip_cidr
 
 def test_validate_ipv4_and_networks():
     assert validate_ip_cidr("1.2.3.4") is True

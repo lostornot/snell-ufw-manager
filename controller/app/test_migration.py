@@ -7,7 +7,7 @@ import sys
 # 确保能导入同级 database 模块
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import pytest
-from database import init_db, get_db_path
+from app.database import init_db, get_db_path
 
 @pytest.mark.asyncio
 async def test_migration():
