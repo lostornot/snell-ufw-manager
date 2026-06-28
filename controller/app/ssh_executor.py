@@ -7,7 +7,7 @@ from pathlib import Path
 
 import asyncssh
 
-from .config import AppConfig
+from config import AppConfig
 
 logger = logging.getLogger(__name__)
 

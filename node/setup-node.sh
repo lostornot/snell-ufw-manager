@@ -347,8 +347,13 @@ echo -e "${BOLD}═════════════════════�
 if (( ERRORS == 0 )); then
     echo -e "${GREEN}${BOLD}  ✓ Setup completed successfully!${NC}"
     echo ""
+    # Detect public IPv4 dynamically for feedback
+    local_v4=$(curl -4 -s --connect-timeout 4 https://api.ipify.org || echo "")
+    if [[ -z "$local_v4" ]]; then
+        local_v4=$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<this-ip>')
+    fi
     echo -e "  The controller can now connect with:"
-    echo -e "  ${CYAN}ssh ${SNELLMGR_USER}@$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<this-ip>') sudo snell-fwctl status${NC}"
+    echo -e "  ${CYAN}ssh ${SNELLMGR_USER}@${local_v4} sudo snell-fwctl status${NC}"
 else
     echo -e "${RED}${BOLD}  ✗ Setup completed with ${ERRORS} error(s)${NC}"
     echo ""

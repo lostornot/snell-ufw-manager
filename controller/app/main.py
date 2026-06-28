@@ -13,9 +13,9 @@ from fastapi.responses import HTMLResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import database as db
-from .config import load_config
-from .ssh_executor import SSHExecutor
+import database as db
+from config import load_config
+from ssh_executor import SSHExecutor
 
 logger = logging.getLogger(__name__)
 config = load_config()
@@ -190,17 +190,23 @@ def convert_to_taiwan_time(ts_str: str, tz_offset_str: str) -> str:
 # ---------------------------------------------------------------------------
 
 def validate_ip_cidr(value: str) -> bool:
-    """Validate an IPv4 address, CIDR notation, or anywhere keywords."""
+    """Validate an IPv4/IPv6 address, CIDR notation, or anywhere keywords."""
     value = value.strip().lower()
     if value in ("any", "anywhere", "all"):
         return True
     try:
         if "/" in value:
-            ipaddress.IPv4Network(value, strict=False)
+            try:
+                ipaddress.IPv4Network(value, strict=False)
+            except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError):
+                ipaddress.IPv6Network(value, strict=False)
         else:
-            ipaddress.IPv4Address(value)
+            try:
+                ipaddress.IPv4Address(value)
+            except (ipaddress.AddressValueError, ValueError):
+                ipaddress.IPv6Address(value)
         return True
-    except (ipaddress.AddressValueError, ipaddress.NetmaskValueError, ValueError):
+    except Exception:
         return False
 
 

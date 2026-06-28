@@ -115,7 +115,7 @@ fi
 
 # 8. 检测公网 IP
 echo -n "  检测本机公网 IP... "
-NODE_IP=$(curl -s -m 4 https://api.ipify.org || curl -s -m 4 https://ifconfig.me || curl -s -m 4 https://ipinfo.io/ip || echo "无法获取")
+NODE_IP=$(curl -4 -s -m 4 https://api.ipify.org || curl -4 -s -m 4 https://ifconfig.me || curl -s -m 4 https://api.ipify.org || echo "无法获取")
 if [ "$NODE_IP" != "无法获取" ]; then
     echo "$NODE_IP ✓"
 else
