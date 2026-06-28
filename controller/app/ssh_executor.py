@@ -19,8 +19,8 @@ class SSHExecutor:
         self.config = config
 
     async def run(self, node: dict, command: str) -> dict:
-        """Execute a snell-fwctl command on a node and return parsed JSON."""
-        full_cmd = f"sudo /usr/local/sbin/snell-fwctl {command}"
+        """Execute a nft-fwctl command on a node and return parsed JSON."""
+        full_cmd = f"sudo /usr/local/sbin/nft-fwctl {command}"
         logger.info("SSH %s@%s: %s", node.get("ssh_user", "snellmgr"), node["host"], full_cmd)
 
         try:
@@ -70,29 +70,35 @@ class SSHExecutor:
     # -- Convenience methods --------------------------------------------------
 
     async def test_connection(self, node: dict) -> dict:
-        """Test SSH connectivity and snell-fwctl availability."""
+        """Test SSH connectivity and nft-fwctl availability."""
         return await self.run(node, "status")
 
+    async def detect_environment(self, node: dict) -> dict:
+        """Detect remote VPS SSH, Snell, Docker, and Tailscale environments."""
+        return await self.run(node, "detect")
+
+    async def plan_policy(self, node: dict, policy_json: str) -> dict:
+        """Get dry-run ruleset plan based on policy JSON."""
+        # Escape quotes in JSON to pass via command line parameter
+        escaped_json = policy_json.replace("'", "'\\''")
+        return await self.run(node, f"plan '{escaped_json}'")
+
+    async def apply_policy(self, node: dict, policy_json: str) -> dict:
+        """Temporarily apply ruleset based on policy JSON (needs confirm to persist)."""
+        escaped_json = policy_json.replace("'", "'\\''")
+        return await self.run(node, f"apply '{escaped_json}'")
+
+    async def confirm_policy(self, node: dict) -> dict:
+        """Confirm temporarily applied policy to make it persisted."""
+        return await self.run(node, "confirm")
+
     async def get_whitelist(self, node: dict) -> dict:
-        """Get all current UFW rules on the node."""
-        return await self.run(node, "list all")
-
-    async def sync_whitelist(self, node: dict, ips: list[str]) -> dict:
-        """Full-sync whitelist: rebuild rules to match the given IP list."""
-        ip_list = ",".join(ips) if ips else ""
-        return await self.run(node, f"sync {node['snell_port']} {ip_list}")
-
-    async def add_ip(self, node: dict, ip_cidr: str) -> dict:
-        """Add a single IP/CIDR to the whitelist."""
-        return await self.run(node, f"add {ip_cidr} {node['snell_port']}")
-
-    async def delete_ip(self, node: dict, ip_cidr: str) -> dict:
-        """Delete a single IP/CIDR from the whitelist."""
-        return await self.run(node, f"delete {ip_cidr} {node['snell_port']}")
+        """Get all UFW rules on the node (mocked interface for compatibility)."""
+        return await self.run(node, "candidates")
 
     async def get_candidates(self, node: dict, hours: int = 24, port: str | None = None) -> dict:
-        """Get recent IPs that accessed/tried to access UFW ports."""
-        query_port = port if port is not None else str(node["snell_port"])
+        """Get recent IPs that tried to access ports from nft log."""
+        query_port = port if port is not None else "all"
         return await self.run(node, f"candidates {query_port} {hours}")
 
     async def get_snell_port(self, node: dict) -> dict:
@@ -101,7 +107,7 @@ class SSHExecutor:
         return await self.run(node, f"port {conf}")
 
     async def backup(self, node: dict) -> dict:
-        """Trigger a UFW rules backup on the node."""
+        """Trigger a rules backup on the node."""
         return await self.run(node, "backup")
 
     async def get_backups(self, node: dict) -> dict:
