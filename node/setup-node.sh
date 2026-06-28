@@ -1,6 +1,6 @@
 #!/bin/bash
 # setup-node.sh — One-time setup for Snell UFW Manager on a node VPS
-# Creates snellmgr user, deploys snell-fwctl, configures sudo & SSH
+# Creates snellmgr user, deploys nft-fwctl, configures sudo & SSH
 #
 # Usage:
 #   bash setup-node.sh --key 'ssh-ed25519 AAAA...' [--from '控制中心IP']
@@ -102,18 +102,18 @@ if [[ "$(id -u)" -ne 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FWCTL_SRC="${SCRIPT_DIR}/snell-fwctl"
+FWCTL_SRC="${SCRIPT_DIR}/nft-fwctl"
 
 if [[ ! -f "$FWCTL_SRC" ]]; then
-    echo -e "${RED}Error: snell-fwctl not found in ${SCRIPT_DIR}${NC}"
+    echo -e "${RED}Error: nft-fwctl not found in ${SCRIPT_DIR}${NC}"
     echo "Both scripts should be in the same directory."
     exit 1
 fi
 
 readonly SNELLMGR_USER="snellmgr"
-readonly FWCTL_DEST="/usr/local/sbin/snell-fwctl"
+readonly FWCTL_DEST="/usr/local/sbin/nft-fwctl"
 readonly SUDOERS_FILE="/etc/sudoers.d/snellmgr"
-readonly BACKUP_DIR="/opt/snell-fwctl/backups"
+readonly BACKUP_DIR="/opt/nft-fwctl/backups"
 
 ERRORS=0
 
@@ -163,14 +163,12 @@ else
     fi
 fi
 
-# ─── Step 2: Deploy snell-fwctl ──────────────────────────────────────────────
-
-section "2/7  Deploy snell-fwctl"
+section "2/7  Deploy nft-fwctl"
 
 if cp "$FWCTL_SRC" "$FWCTL_DEST" 2>/dev/null; then
     step_ok "Copied to ${FWCTL_DEST}"
 else
-    step_fail "Failed to copy snell-fwctl to ${FWCTL_DEST}"
+    step_fail "Failed to copy nft-fwctl to ${FWCTL_DEST}"
     (( ERRORS++ ))
 fi
 
@@ -238,8 +236,8 @@ if mkdir -p "$BACKUP_DIR" 2>/dev/null; then
     chown "${SNELLMGR_USER}:${SNELLMGR_USER}" "$BACKUP_DIR" 2>/dev/null || \
         chown "${SNELLMGR_USER}:" "$BACKUP_DIR" 2>/dev/null || true
     # Root needs to own parent for security, but backup dir is for convenience
-    chown root:root /opt/snell-fwctl 2>/dev/null || true
-    chmod 755 /opt/snell-fwctl 2>/dev/null || true
+    chown root:root /opt/nft-fwctl 2>/dev/null || true
+    chmod 755 /opt/nft-fwctl 2>/dev/null || true
     chmod 755 "$BACKUP_DIR" 2>/dev/null || true
     step_ok "Backup directory: ${BACKUP_DIR}"
 else
@@ -322,19 +320,18 @@ else
 fi
 
 
-# ─── Step 7: Test snell-fwctl ────────────────────────────────────────────────
+# ─── Step 7: Test nft-fwctl ────────────────────────────────────────────────
 
-section "7/7  Test snell-fwctl"
+section "7/7  Test nft-fwctl"
 
 step_info "Running: sudo -u ${SNELLMGR_USER} sudo ${FWCTL_DEST} status"
 
 TEST_OUTPUT=$(sudo -u "$SNELLMGR_USER" sudo "$FWCTL_DEST" status 2>&1) || true
 
 if echo "$TEST_OUTPUT" | grep -q '"ok": true'; then
-    step_ok "snell-fwctl status test passed"
-    step_info "Output: ${TEST_OUTPUT}"
+    step_ok "nft-fwctl status test passed"
 else
-    step_fail "snell-fwctl status test failed"
+    step_fail "nft-fwctl status test failed"
     step_info "Output: ${TEST_OUTPUT}"
     (( ERRORS++ ))
 fi
@@ -353,7 +350,7 @@ if (( ERRORS == 0 )); then
         local_v4=$(hostname -I 2>/dev/null | awk '{print $1}' || echo '<this-ip>')
     fi
     echo -e "  The controller can now connect with:"
-    echo -e "  ${CYAN}ssh ${SNELLMGR_USER}@${local_v4} sudo snell-fwctl status${NC}"
+    echo -e "  ${CYAN}ssh ${SNELLMGR_USER}@${local_v4} sudo nft-fwctl status${NC}"
 else
     echo -e "${RED}${BOLD}  ✗ Setup completed with ${ERRORS} error(s)${NC}"
     echo ""

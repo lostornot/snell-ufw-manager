@@ -1211,12 +1211,12 @@ async def api_setup_script():
     pubkey = ssh.get_public_key()
     ctrl_ip = ssh.get_controller_ip()
 
-    # Read snell-fwctl script content
-    fwctl_path = NODE_DIR / "snell-fwctl"
+    # Read nft-fwctl script content
+    fwctl_path = NODE_DIR / "nft-fwctl"
     try:
         fwctl_content = fwctl_path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        fwctl_content = "#!/bin/bash\necho '{\"ok\":false,\"error\":\"snell-fwctl not deployed\"}'"
+        fwctl_content = "#!/bin/bash\necho '{\"ok\":false,\"error\":\"nft-fwctl not deployed\"}'"
 
     script = f"""#!/bin/bash
 # VPS UFW Firewall Manager — Node Setup Script
@@ -1228,7 +1228,7 @@ PUBKEY='{pubkey}'
 CTRL_IP='{ctrl_ip}'
 
 echo "══════════════════════════════════════════"
-echo " VPS UFW Firewall Manager — 节点初始化"
+echo " Multi-VPS Firewall Manager — 节点初始化"
 echo "══════════════════════════════════════════"
 
 # 0. Configure Timezone
@@ -1249,18 +1249,18 @@ else
     echo "完成 ✓"
 fi
 
-# 2. Deploy snell-fwctl
-echo -n "  部署 snell-fwctl... "
-cat > /usr/local/sbin/snell-fwctl << 'SNELL_FWCTL_EOF'
+# 2. Deploy nft-fwctl
+echo -n "  部署 nft-fwctl... "
+cat > /usr/local/sbin/nft-fwctl << 'SNELL_FWCTL_EOF'
 {fwctl_content}
 SNELL_FWCTL_EOF
-chmod 755 /usr/local/sbin/snell-fwctl
-chown root:root /usr/local/sbin/snell-fwctl
+chmod 755 /usr/local/sbin/nft-fwctl
+chown root:root /usr/local/sbin/nft-fwctl
 echo "完成 ✓"
 
 # 3. Configure sudoers
 echo -n "  配置 sudoers... "
-echo 'snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/snell-fwctl' \\
+echo 'snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/nft-fwctl' \\
     > /etc/sudoers.d/snellmgr
 chmod 440 /etc/sudoers.d/snellmgr
 echo "完成 ✓"
@@ -1268,11 +1268,7 @@ echo "完成 ✓"
 # 4. Deploy SSH key
 echo -n "  部署 SSH 公钥... "
 mkdir -p /home/snellmgr/.ssh
-if [ -n "$CTRL_IP" ] && [ "$CTRL_IP" != "<控制中心IP>" ]; then
-    echo "from=\\"$CTRL_IP\\" $PUBKEY" > /home/snellmgr/.ssh/authorized_keys
-else
-    echo "$PUBKEY" > /home/snellmgr/.ssh/authorized_keys
-fi
+echo "$PUBKEY" > /home/snellmgr/.ssh/authorized_keys
 chmod 700 /home/snellmgr/.ssh
 chmod 600 /home/snellmgr/.ssh/authorized_keys
 chown -R snellmgr:snellmgr /home/snellmgr/.ssh
@@ -1280,8 +1276,8 @@ echo "完成 ✓"
 
 # 5. Create backup directory
 echo -n "  创建备份目录... "
-mkdir -p /opt/snell-fwctl/backups
-chown -R snellmgr:snellmgr /opt/snell-fwctl
+mkdir -p /opt/nft-fwctl/backups
+chown -R snellmgr:snellmgr /opt/nft-fwctl
 echo "完成 ✓"
 
 # 6. Ensure UFW is installed, configured, and active
@@ -1335,8 +1331,8 @@ else
 fi
 
 # 7. Test
-echo -n "  测试 snell-fwctl... "
-RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/snell-fwctl status 2>&1) || true
+echo -n "  测试 nft-fwctl... "
+RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/nft-fwctl status 2>&1) || true
 if echo "$RESULT" | grep -q '"ok":true'; then
     echo "通过 ✓"
 else
@@ -1363,11 +1359,11 @@ async def partial_setup_script(request: Request):
     if "," in client_ip:
         client_ip = client_ip.split(",")[0].strip()
         
-    fwctl_path = NODE_DIR / "snell-fwctl"
+    fwctl_path = NODE_DIR / "nft-fwctl"
     try:
         fwctl_content = fwctl_path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        fwctl_content = "# snell-fwctl not found"
+        fwctl_content = "# nft-fwctl not found"
 
     return templates.TemplateResponse(
         "partials/setup_script.html",

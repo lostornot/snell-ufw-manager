@@ -24,18 +24,18 @@ else
     echo "完成 ✓"
 fi
 
-# 2. 部署 snell-fwctl
-echo -n "  部署 snell-fwctl... "
-cat > /usr/local/sbin/snell-fwctl << 'SNELL_FWCTL_EOF'
+# 2. 部署 nft-fwctl
+echo -n "  部署 nft-fwctl... "
+cat > /usr/local/sbin/nft-fwctl << 'SNELL_FWCTL_EOF'
 {{ fwctl_content }}
 SNELL_FWCTL_EOF
-chmod 755 /usr/local/sbin/snell-fwctl
-chown root:root /usr/local/sbin/snell-fwctl
+chmod 755 /usr/local/sbin/nft-fwctl
+chown root:root /usr/local/sbin/nft-fwctl
 echo "完成 ✓"
 
 # 3. 配置 sudoers
 echo -n "  配置 sudoers... "
-echo 'snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/snell-fwctl' \
+echo 'snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/nft-fwctl' \
     > /etc/sudoers.d/snellmgr
 chmod 440 /etc/sudoers.d/snellmgr
 echo "完成 ✓"
@@ -100,8 +100,8 @@ fi
 
 
 # 7. 测试
-echo -n "  测试 snell-fwctl... "
-RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/snell-fwctl status 2>&1)
+echo -n "  测试 nft-fwctl... "
+RESULT=$(sudo -u snellmgr sudo /usr/local/sbin/nft-fwctl status 2>&1)
 if echo "$RESULT" | grep -q '"ok": true'; then
     echo "通过 ✓"
 else
@@ -111,7 +111,7 @@ fi
 
 # 8. 检测公网 IP
 echo -n "  检测本机公网 IP... "
-NODE_IP=$(curl -4 -s -m 4 https://api.ipify.org || curl -4 -s -m 4 https://ifconfig.me || curl -s -m 4 https://api.ipify.org || echo "无法获取")
+NODE_IP=$(curl -4 -s -m 4 https://api.ipify.org || curl -4 -s -m 4 https://ifconfig.me || curl -s -m 4 https://api.ipify.org || hostname -I 2>/dev/null | awk '{print $1}' || echo "无法获取")
 if [ "$NODE_IP" != "无法获取" ]; then
     echo "$NODE_IP ✓"
 else
