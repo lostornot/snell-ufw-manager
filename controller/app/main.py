@@ -27,13 +27,37 @@ STATIC_DIR = APP_DIR / "static"
 NODE_DIR = Path(__file__).parent.parent.parent / "node"
 
 
-# ---------------------------------------------------------------------------
-# Geolocation & Regional Flags Helpers
-# ---------------------------------------------------------------------------
+def clean_isp_name(isp: str) -> str:
+    """Clean and translate raw ISP names to reader-friendly Chinese descriptions."""
+    if not isp:
+        return ""
+    isp_lower = isp.lower()
+    if "chinanet" in isp_lower or "china telecom" in isp_lower or "电信" in isp_lower:
+        return "中国电信"
+    if "unicom" in isp_lower or "china unicom" in isp_lower or "联通" in isp_lower:
+        return "中国联通"
+    if "mobile" in isp_lower or "china mobile" in isp_lower or "移动" in isp_lower:
+        return "中国移动"
+    if "google" in isp_lower:
+        return "Google"
+    if "cloudflare" in isp_lower:
+        return "Cloudflare"
+    if "amazon" in isp_lower:
+        return "Amazon"
+    if "microsoft" in isp_lower or "azure" in isp_lower:
+        return "Azure"
+    if "alibaba" in isp_lower or "alicloud" in isp_lower:
+        return "阿里云"
+    if "tencent" in isp_lower:
+        return "腾讯云"
+    if "oracle" in isp_lower:
+        return "Oracle"
+    return isp
+
 
 def _sync_get_ip_geo(host: str) -> tuple[str, str, str, str]:
     """Blocking sync call to ip-api using urllib, returning (country, country_code, city, asn)."""
-    url = f"http://ip-api.com/json/{host}"
+    url = f"http://ip-api.com/json/{host}?lang=zh-CN"
     try:
         req = urllib.request.Request(
             url, 
@@ -46,7 +70,25 @@ def _sync_get_ip_geo(host: str) -> tuple[str, str, str, str]:
                     country = data.get("country", "未知地区")
                     country_code = data.get("countryCode", "XX")
                     city = data.get("city", "")
-                    asn = data.get("as", "")  # e.g., "AS13335 Cloudflare, Inc."
+                    
+                    as_field = data.get("as", "")
+                    isp_field = data.get("isp", "")
+                    
+                    as_code = ""
+                    if as_field:
+                        m = re.match(r"^(AS\d+)", as_field)
+                        if m:
+                            as_code = m.group(1)
+                            
+                    clean_isp = clean_isp_name(isp_field)
+                    
+                    if as_code and clean_isp:
+                        asn = f"{as_code} {clean_isp}"
+                    elif clean_isp:
+                        asn = clean_isp
+                    else:
+                        asn = as_field
+                        
                     return country, country_code, city, asn
     except Exception:
         pass
@@ -850,10 +892,20 @@ async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict
 
     # Get IP remarks for display
     ip_remarks = await db.get_ip_remarks_map()
+    all_ips = [r["ip"] for r in rules if r.get("ip")]
+    ip_geos = await get_bulk_ip_geo(all_ips)
 
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
-        {"request": request, "node": node, "port_data": port_data, "toast": toast, "ip_remarks": ip_remarks, "all_tags": all_tags},
+        {
+            "request": request, 
+            "node": node, 
+            "port_data": port_data, 
+            "toast": toast, 
+            "ip_remarks": ip_remarks, 
+            "all_tags": all_tags,
+            "ip_geos": ip_geos
+        },
     )
 
 

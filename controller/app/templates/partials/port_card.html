@@ -53,13 +53,13 @@
         {% if ip_geos is defined and rule.ip in ip_geos %}
           {% set geo = ip_geos[rule.ip] %}
           {% if geo.country_code != 'XX' %}
-            <span style="font-size: 0.72rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 3px; cursor: help; background: rgba(15, 23, 42, 0.03); padding: 1px 4px; border-radius: 3px;"
+            <span style="font-size: 0.72rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; cursor: help; background: rgba(124, 58, 237, 0.05); border: 1px solid var(--border-glass); padding: 1px 5px; border-radius: 3px;"
                   title="国家: {{ geo.country }}&#10;城市: {{ geo.city }}&#10;运营商/ASN: {{ geo.asn }}">
               <span>{{ geo.flag }}</span>
-              <span style="font-weight: 500;">{{ geo.country }}</span>
+              <span style="font-weight: 600;">{{ geo.country }}</span>
               {% if geo.asn_org %}
-                <span style="opacity: 0.5;">•</span>
-                <span style="color: var(--text-muted); font-size: 0.68rem;">{{ geo.asn_org | truncate(12, True, '') }}</span>
+                <span style="opacity: 0.4;">|</span>
+                <span style="color: var(--text-muted); font-size: 0.68rem; font-weight: 500;">{{ geo.asn_org | truncate(18, True, '...') }}</span>
               {% endif %}
             </span>
           {% endif %}
