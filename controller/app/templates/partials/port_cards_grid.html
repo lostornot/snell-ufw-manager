@@ -5,21 +5,138 @@
 </div>
 {% endif %}
 
-<div id="port-cards-grid" style="display: flex; flex-direction: column; gap: 16px; width: 100%;">
-  {% for port_num, data in port_data.items() %}
-    {% include "partials/port_card.html" %}
-  {% else %}
-    <div class="empty-state" style="width: 100%; padding: 48px 24px; text-align: center; color: var(--text-muted);">
-      <p>当前节点无额外放行端口规则（或 UFW 为关闭状态）</p>
+<div id="port-cards-grid" style="width: 100%;">
+  <form hx-post="/api/nodes/{{ node.id }}/ports" 
+        hx-target="#port-cards-grid" 
+        hx-swap="outerHTML"
+        style="display: flex; flex-direction: column; gap: 20px; width: 100%;">
+
+    <!-- Card 1: Snell Proxy -->
+    {% set snell = port_data.get('snell', {'port': node.snell_port, 'allow_sets': ['relay_ips', 'direct_ips']}) %}
+    <div class="port-card glass-card" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; width: 100%; box-sizing: border-box; border-radius: var(--radius-md);">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">Snell 代理服务</span>
+          <span class="tag tag-warn" style="font-size: 0.72rem; padding: 2px 6px;">⚡ SNELL</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent-purple);">
+          {{ snell.port }} <span style="font-size: 0.8rem; color: var(--text-muted);">/tcp+udp</span>
+        </div>
+      </div>
+      
+      <div>
+        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px;">允许的来源集合 (Source Sets)</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+            <input type="checkbox" name="snell_allow" value="relay_ips" {% if 'relay_ips' in snell.allow_sets %}checked{% endif %} style="accent-color: var(--accent-purple); width: 16px; height: 16px;">
+            <span>中转 IP 组 (relay_ips)</span>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+            <input type="checkbox" name="snell_allow" value="direct_ips" {% if 'direct_ips' in snell.allow_sets %}checked{% endif %} style="accent-color: var(--accent-purple); width: 16px; height: 16px;">
+            <span>直连 IP 组 (direct_ips)</span>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+            <input type="checkbox" name="snell_allow" value="temp_ips" {% if 'temp_ips' in snell.allow_sets %}checked{% endif %} style="accent-color: var(--accent-purple); width: 16px; height: 16px;">
+            <span>临时 IP 组 (temp_ips)</span>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);" 
+                 onclick="toggleCnWarning(this)">
+            <input type="checkbox" id="cn-fallback-checkbox" name="snell_allow" value="cn_ips" {% if 'cn_ips' in snell.allow_sets %}checked{% endif %} style="accent-color: var(--accent-purple); width: 16px; height: 16px;">
+            <span style="color: var(--accent-red); font-weight: 600;">中国 IP 兜底 (cn_ips)</span>
+          </label>
+        </div>
+
+        <!-- CN Fallback Risk Warning Card -->
+        <div id="cn-risk-warning" class="glass-card" style="margin-top: 12px; padding: 12px 16px; background: rgba(239, 68, 68, 0.05); border: 1px dashed var(--accent-red); display: {% if 'cn_ips' in snell.allow_sets %}block{% else %}none{% endif %};">
+          <div style="color: var(--accent-red); font-size: 0.82rem; line-height: 1.4; font-weight: 500;">
+            ⚠️ <strong>风险提示：</strong>中国 IP 兜底会允许所有中国大陆来源访问 Snell 端口，包括云服务器、IDC、扫描器和代理节点。建议仅在直连备用场景临时开启。
+          </div>
+        </div>
+      </div>
     </div>
-  {% endfor %}
+
+    <!-- Card 2: SSH Service -->
+    {% set ssh_svc = port_data.get('ssh', {'port': node.ssh_port | default(22), 'allow_sets': ['tailscale_ips', 'direct_ips']}) %}
+    <div class="port-card glass-card" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; width: 100%; box-sizing: border-box; border-radius: var(--radius-md);">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">SSH 管理服务</span>
+          <span class="tag tag-info" style="font-size: 0.72rem; padding: 2px 6px;">🔒 SSH</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent-blue);">
+          {{ ssh_svc.port }} <span style="font-size: 0.8rem; color: var(--text-muted);">/tcp</span>
+        </div>
+      </div>
+      
+      <div>
+        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px;">允许的来源集合 (Source Sets)</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+            <input type="checkbox" name="ssh_allow" value="tailscale_ips" {% if 'tailscale_ips' in ssh_svc.allow_sets %}checked{% endif %} style="accent-color: var(--accent-blue); width: 16px; height: 16px;">
+            <span>Tailscale 内网 IP (tailscale_ips)</span>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+            <input type="checkbox" name="ssh_allow" value="direct_ips" {% if 'direct_ips' in ssh_svc.allow_sets %}checked{% endif %} style="accent-color: var(--accent-blue); width: 16px; height: 16px;">
+            <span>直连 IP 组 (direct_ips)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 3: iPerf3 Testing -->
+    {% set iperf3 = port_data.get('iperf3', {'port': 5201, 'allow_sets': []}) %}
+    <div class="port-card glass-card" style="display: flex; flex-direction: column; gap: 16px; padding: 20px; width: 100%; box-sizing: border-box; border-radius: var(--radius-md);">
+      <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--border-glass); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.25rem; font-weight: 800; color: var(--text-primary);">iPerf3 测速服务</span>
+          <span class="tag tag-allow" style="font-size: 0.72rem; padding: 2px 6px; background: rgba(59, 130, 246, 0.08); border-color: rgba(59, 130, 246, 0.2); color: #60a5fa;">⚙️ IPERF3</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 1.1rem; font-weight: 700; color: var(--accent-purple);">
+          5201 <span style="font-size: 0.8rem; color: var(--text-muted);">/tcp</span>
+        </div>
+      </div>
+      
+      <div>
+        <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 8px;">允许的来源集合 (Source Sets)</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+          <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 0.9rem; color: var(--text-primary);">
+            <input type="checkbox" name="iperf3_allow" value="temp_ips" {% if 'temp_ips' in iperf3.allow_sets %}checked{% endif %} style="accent-color: var(--accent-purple); width: 16px; height: 16px;">
+            <span>临时 IP 组 (temp_ips)</span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Docker Risk Warning Card (If detected) -->
+    {% if docker_status is defined and docker_status.risk == 'bridge_published_port' %}
+    <div class="glass-card" style="padding: 16px; background: rgba(234, 179, 8, 0.05); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: var(--radius-md);">
+      <div style="color: var(--text-primary); font-size: 0.85rem; line-height: 1.5;">
+        ⚠️ <strong>Docker 网络风险警告：</strong>检测到该端口可能通过 Docker bridge published port 暴露。Docker 会创建自己的防火墙/NAT 规则，可能导致面板规则与实际公网暴露不一致。第一版暂不自动管理 Docker bridge 端口，请改用 host network 或宿主机进程监听。
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Submit Section (Strict AGENTS.md button requirements: no emoji, perfectly centered, native flex) -->
+    <div style="display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 10px;">
+      <button type="submit" 
+              class="btn btn-primary" 
+              style="width: 280px; height: 44px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem; font-weight: 600; text-align: center; border-radius: var(--radius-md);">
+        应用防火墙策略
+      </button>
+    </div>
+
+  </form>
 </div>
 
-{% if all_tags is defined and all_tags is not none %}
-<select name="ip_tag_select" id="sidebar-ip-tag-select" class="form-select" hx-swap-oob="true">
-  <option value="">-- 不关联标签 --</option>
-  {% for tag in all_tags %}
-  <option value="{{ tag }}">{{ tag }}</option>
-  {% endfor %}
-</select>
-{% endif %}
+<script>
+  function toggleCnWarning(el) {
+    var checkbox = document.getElementById('cn-fallback-checkbox');
+    var warningCard = document.getElementById('cn-risk-warning');
+    if (checkbox && warningCard) {
+      // Toggle warning display state based on checkout state
+      setTimeout(function() {
+        warningCard.style.display = checkbox.checked ? 'block' : 'none';
+      }, 50);
+    }
+  }
+</script>

@@ -12,20 +12,20 @@
 {% include "partials/node_detail_header.html" %}
 
 <!-- Main Detail Layout -->
-<div class="node-detail-layout">
+<div class="node-detail-layout" style="display: flex; flex-direction: column; gap: 20px;">
   
   <!-- Left Column: Ports Cards Grid & Logs -->
-  <div class="port-grid-section">
+  <div class="port-grid-section" style="width: 100%;">
     <!-- Port Cards Container Card -->
     <div class="glass-card" style="padding: 24px;">
-      <div class="section-header" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 12px;">
-        <h2 style="font-size: 1.35rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px;">
-          <span>🛡️</span> UFW 服务端口状态
+      <div class="section-header" style="margin-bottom: 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center;">
+        <h2 style="font-size: 1.35rem; color: var(--text-primary); display: flex; align-items: center; gap: 8px; margin: 0;">
+          <span>🛡️</span> nftables 入站策略
         </h2>
         <button class="btn btn-ghost btn-sm"
                 hx-get="/api/nodes/{{ node.id }}/ports"
                 hx-target="#port-cards-grid"
-                hx-swap="innerHTML"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>刷新规则</button>
+                hx-swap="outerHTML"><span class="spinner htmx-indicator" style="margin-right: 6px;"></span>刷新规则</button>
       </div>
       
       <!-- Port Cards Grid Target -->
@@ -34,132 +34,11 @@
              hx-get="/api/nodes/{{ node.id }}/ports"
              hx-trigger="load"
              hx-swap="outerHTML">
-          <span class="spinner"></span> 正在从远程主机获取 UFW 规则...
+          <span class="spinner"></span> 正在从远程主机获取防火墙策略...
         </div>
       </div>
     </div>
-
-
   </div>
-
-  <!-- Right Column: Sidebar Sticky Form -->
-  <div class="sidebar-section">
-    <div class="glass-card sticky" style="padding: 24px;">
-      <h3>⚡ 端口防火墙部署</h3>
-      <form id="bulk-port-form"
-            hx-target="#port-cards-grid"
-            hx-swap="innerHTML"
-            hx-indicator="#port-action-spinner"
-            hx-on::after-request="if(event.detail.successful) { this.reset(); updateSelectedCount(); }">
-        
-        <!-- Section 1: Service and Port -->
-        <div class="form-section-card">
-          <div class="form-section-header" style="color: var(--accent-purple);">
-            <span>⚙️</span> 服务及端口配置
-          </div>
-          <div class="form-group">
-            <label class="form-label">端口号 *</label>
-            <input type="number" name="port" class="form-input mono" placeholder="如 8388" required min="1" max="65535">
-          </div>
-          <div class="form-group">
-            <label class="form-label">协议 *</label>
-            <select name="protocol" class="form-select">
-              <option value="both">TCP + UDP (推荐)</option>
-              <option value="tcp">TCP ONLY</option>
-              <option value="udp">UDP ONLY</option>
-            </select>
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">服务标签 *</label>
-            <select name="service_tag" class="form-select">
-              <option value="Snell Proxy">Snell Proxy (代理)</option>
-              <option value="SSH Access">SSH Access (运维)</option>
-              <option value="Custom Rule">Custom Rule (自定义)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Section 2: IP Whitelist (Tag-based) -->
-        <div class="form-section-card">
-          <div class="form-section-header" style="color: var(--accent-blue);">
-            <span>💡</span> IP 授权白名单
-          </div>
-          <div class="form-group">
-            <label class="form-label">单一 IP 或网段 (CIDR)</label>
-            <input type="text" name="initial_ip" class="form-input mono" placeholder="例如: 1.2.3.4">
-          </div>
-          <div class="form-group">
-            <label class="form-label">IP 标签</label>
-            <input type="text" name="ip_tag" class="form-input" placeholder="如：家庭宽带、NL中转">
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">或选择现有标签批量放行</label>
-            <select name="ip_tag_select" id="sidebar-ip-tag-select" class="form-select">
-              <option value="">-- 不关联标签 --</option>
-              {% for tag in all_tags %}
-              <option value="{{ tag }}">{{ tag }}</option>
-              {% endfor %}
-            </select>
-          </div>
-        </div>
-
-        <!-- Section 3: Bulk Deployment -->
-        <div class="form-section-card" style="margin-bottom: 24px;">
-          <div class="form-section-header" style="color: var(--accent-teal);">
-            <span>🖥️</span> 批量部署选项 (可选)
-          </div>
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">同时应用到以下被控节点：</label>
-            
-            <div class="custom-multiselect" id="nodes-multiselect">
-              <div class="multiselect-trigger" onclick="toggleMultiselect(event)">
-                <span class="placeholder-text" style="color: var(--text-muted);">选择应用节点...</span>
-                <span class="dropdown-arrow">▼</span>
-              </div>
-              <div class="multiselect-dropdown">
-                {% for n in all_nodes %}
-                  {% if n.id != node.id %}
-                  <label class="multiselect-item" onclick="event.stopPropagation();" style="align-items: center;">
-                    <input type="checkbox" name="target_node_ids" value="{{ n.id }}" onchange="updateSelectedCount()" style="flex-shrink: 0;">
-                    <span style="font-size: 1.15rem; flex-shrink: 0; line-height: 1;">{{ get_flag_emoji(n.country_code) }}</span>
-                    <div style="display: flex; flex-direction: column; min-width: 0; flex-grow: 1; line-height: 1.25;">
-                      <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ n.name }}">{{ n.name }}</span>
-                      <span class="text-muted mono" style="font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ n.host }}</span>
-                    </div>
-                  </label>
-                  {% endif %}
-                {% endfor %}
-                {% if (all_nodes | length) <= 1 %}
-                  <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; padding: 8px 0;">没有其他节点可选</div>
-                {% endif %}
-              </div>
-            </div>
-            
-          </div>
-        </div>
-        
-        <div style="display: flex; flex-direction: column; gap: 10px;">
-          <button type="submit" 
-                  class="btn btn-primary w-full" 
-                  hx-post="/api/nodes/{{ node.id }}/ports"
-                  style="font-weight: bold;">
-            <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
-            确认批量放行部署
-          </button>
-          
-          <button type="submit" 
-                  class="btn btn-danger w-full" 
-                  hx-post="/api/nodes/{{ node.id }}/ports/bulk-delete"
-                  hx-confirm="确定要在选中的所有 VPS 上，针对该端口删除对应的 IP 白名单规则吗？"
-                  style="font-weight: bold;">
-            <span class="spinner htmx-indicator" id="port-action-spinner" style="margin-right: 6px;"></span>
-            确认批量删除白名单
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-
 </div>
 
 <!-- Access Log Candidate Analysis -->

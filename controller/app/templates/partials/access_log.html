@@ -130,17 +130,17 @@
           <!-- 12. Actions -->
           <td style="white-space: nowrap; text-align: right; padding: 10px 12px; vertical-align: middle;">
             {% if not in_whitelist %}
-            <button hx-post="/api/nodes/{{ node.id }}/ports/{{ rule_port }}/ips"
-                    hx-vals='{"ip_cidr": "{{ c.ip }}"}'
-                    hx-target="#port-card-{{ rule_port }}"
-                    hx-swap="outerHTML"
+            <button hx-post="/api/ip-addresses"
+                    hx-vals='{"ip_cidr": "{{ c.ip }}", "tag": "direct_ips"}'
+                    hx-swap="none"
                     class="btn btn-secondary btn-sm"
                     style="white-space: nowrap; height: 28px; padding: 2px 8px; font-weight: 600; font-size: 0.75rem; display: inline-flex; align-items: center; justify-content: center;"
-                    title="直接放行此 IP 到主机的端口 {{ rule_port }}">
-              放行
+                    hx-on::after-request="if(event.detail.successful) { this.textContent = '已收录'; this.disabled = true; }"
+                    title="将此 IP 收录至直连白名单 IP 组">
+              收录
             </button>
             {% else %}
-            <span class="text-secondary text-sm" style="white-space: nowrap; opacity: 0.7;">已放行</span>
+            <span class="text-secondary text-sm" style="white-space: nowrap; opacity: 0.7;">已收录</span>
             {% endif %}
           </td>
         </tr>

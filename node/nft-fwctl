@@ -159,8 +159,22 @@ generate_ruleset() {
         json_err "invalid policy json schema"
     fi
 
-    # Extract allowed source sets using grep/sed
-    # First, parse source sets to allow
+    # Parse strategy IP list elements using inline python
+    local relay_elements=""
+    local direct_elements=""
+    local tailscale_elements=""
+    local cn_elements=""
+    local temp_elements=""
+
+    if command -v python3 &>/dev/null; then
+        relay_elements=$(echo "$policy_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(', '.join([ip.strip() for ip in data.get('relay_ips', []) if ip.strip()]))" 2>/dev/null || true)
+        direct_elements=$(echo "$policy_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(', '.join([ip.strip() for ip in data.get('direct_ips', []) if ip.strip()]))" 2>/dev/null || true)
+        tailscale_elements=$(echo "$policy_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(', '.join([ip.strip() for ip in data.get('tailscale_ips', []) if ip.strip()]))" 2>/dev/null || true)
+        cn_elements=$(echo "$policy_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(', '.join([ip.strip() for ip in data.get('cn_ips', []) if ip.strip()]))" 2>/dev/null || true)
+        temp_elements=$(echo "$policy_json" | python3 -c "import sys, json; data=json.load(sys.stdin); print(', '.join([ip.strip() for ip in data.get('temp_ips', []) if ip.strip()]))" 2>/dev/null || true)
+    fi
+
+    # Extract allowed source sets using grep
     local allow_relay="false"
     local allow_direct="false"
     local allow_tailscale="false"
@@ -196,22 +210,27 @@ table inet snell_mgr {
     set relay_ips {
         type ipv4_addr
         flags interval
+$( [[ -n "$relay_elements" ]] && echo "        elements = { ${relay_elements} }" )
     }
     set direct_ips {
         type ipv4_addr
         flags interval
+$( [[ -n "$direct_elements" ]] && echo "        elements = { ${direct_elements} }" )
     }
     set tailscale_ips {
         type ipv4_addr
         flags interval
+$( [[ -n "$tailscale_elements" ]] && echo "        elements = { ${tailscale_elements} }" )
     }
     set cn_ips {
         type ipv4_addr
         flags interval
+$( [[ -n "$cn_elements" ]] && echo "        elements = { ${cn_elements} }" )
     }
     set temp_ips {
         type ipv4_addr
         flags interval
+$( [[ -n "$temp_elements" ]] && echo "        elements = { ${temp_elements} }" )
     }
 
     chain input {
@@ -227,9 +246,10 @@ table inet snell_mgr {
         ip protocol icmp accept
         ip6 nexthdr ipv6-icmp accept
 
-        # Safety Guard: Allow current connecting IP to prevent lock out
-        # We also allow Tailscale range by default
+        # Safety Guard: Allow Tailscale range by default for SSH
         ip saddr @tailscale_ips tcp dport ${ssh_port} accept
+        # Also always allow direct_ips to access SSH for safety lockout prevention
+        ip saddr @direct_ips tcp dport ${ssh_port} accept
 
         # Apply strategy allowed sets
 EOF

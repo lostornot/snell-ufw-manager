@@ -48,16 +48,30 @@
 
     <!-- Active Ports list side-by-side -->
     {% if status.online %}
-    <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 180px;">
-      {% if status.ports %}
-        {% for p in status.ports %}
-        <span class="tag tag-info mono" style="font-size: 0.68rem; padding: 1px 5px; border-radius: 4px;">
-          {{ p }}
-        </span>
-        {% endfor %}
-      {% else %}
-        <span class="no-rules" style="font-size: 0.75rem;">无端口</span>
-      {% endif %}
+    <div style="display: flex; flex-direction: column; gap: 4px; align-items: flex-end;">
+      <div style="display: flex; gap: 4px; align-items: center;">
+        {% if status.nftables_active %}
+          <span class="tag tag-allow" style="font-size: 0.65rem; padding: 1px 4px; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.2); color: #34d399;">nftables</span>
+        {% else %}
+          <span class="tag" style="font-size: 0.65rem; padding: 1px 4px; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.2); color: #f87171;">未激活</span>
+        {% endif %}
+
+        {% if status.docker_risk and status.docker_risk != 'none' %}
+          <span class="tag tag-warn" style="font-size: 0.65rem; padding: 1px 4px; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.2); color: #fbbf24;" title="Docker bridge 端口冲突风险">Docker 风险</span>
+        {% endif %}
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 4px; justify-content: flex-end; max-width: 180px;">
+        {% if status.ports %}
+          {% for p in status.ports %}
+          <span class="tag tag-info mono" style="font-size: 0.68rem; padding: 1px 5px; border-radius: 4px;">
+            {{ p }}
+          </span>
+          {% endfor %}
+        {% else %}
+          <span class="no-rules" style="font-size: 0.75rem;">无端口</span>
+        {% endif %}
+      </div>
     </div>
     {% endif %}
   </div>
