@@ -23,3 +23,7 @@ backups/
 # SSH keys (never commit)
 *.pem
 snellmgr_ed25519*
+
+# Logs
+*.log
+controller/uvicorn.log
