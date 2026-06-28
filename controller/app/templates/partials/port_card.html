@@ -25,6 +25,7 @@
   <!-- Section 2: Middle (Whitelisted IPs flow) - Takes all remaining space, wraps automatically, NO overlap -->
   <div style="flex: 1 1 0%; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; align-content: center; padding: 4px 0;">
     {% for rule in data.rules %}
+      {% set clean_ip = rule.ip.strip() if rule.ip else '' %}
       <div class="ip-pill" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.04); border: 1px solid rgba(15, 23, 42, 0.08); border-radius: var(--radius-sm); padding: 3px 8px; white-space: nowrap;">
         <!-- 1. Protocol Badge -->
         <span style="font-size: 0.62rem; font-weight: 700; color: var(--accent-purple); text-transform: uppercase; background: rgba(139, 92, 246, 0.08); padding: 1px 4px; border-radius: 2px; border: 1px solid rgba(139, 92, 246, 0.15);">
@@ -33,25 +34,25 @@
 
         <!-- 2. IP Address -->
         <span class="ip-address font-mono" style="font-size: 0.82rem; color: var(--text-primary); font-weight: 600;">
-          {% if rule.ip == 'any' or rule.ip == 'anywhere' or rule.ip == 'Anywhere' %}
+          {% if clean_ip == 'any' or clean_ip == 'anywhere' or clean_ip == 'Anywhere' or clean_ip == '' %}
             Anywhere
           {% else %}
-            {{ rule.ip }}
+            {{ clean_ip }}
           {% endif %}
         </span>
 
         <!-- 3. IP Tag Remark -->
-        {% if rule.ip != 'any' and rule.ip != 'anywhere' and rule.ip != 'Anywhere' %}
-          {% if ip_remarks is defined and rule.ip in ip_remarks and ip_remarks[rule.ip] %}
+        {% if clean_ip != 'any' and clean_ip != 'anywhere' and clean_ip != 'Anywhere' and clean_ip != '' %}
+          {% if ip_remarks is defined and clean_ip in ip_remarks and ip_remarks[clean_ip] %}
             <span style="font-size: 0.68rem; padding: 1px 4px; border-radius: 3px; background: rgba(59, 130, 246, 0.06); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.15);">
-              {{ ip_remarks[rule.ip] }}
+              {{ ip_remarks[clean_ip] }}
             </span>
           {% endif %}
         {% endif %}
 
         <!-- 4. Geolocation inline (Flag + Country + Provider) -->
-        {% if ip_geos is defined and rule.ip in ip_geos %}
-          {% set geo = ip_geos[rule.ip] %}
+        {% if ip_geos is defined and clean_ip in ip_geos %}
+          {% set geo = ip_geos[clean_ip] %}
           {% if geo.country_code != 'XX' %}
             <span style="font-size: 0.72rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 4px; cursor: help; background: rgba(124, 58, 237, 0.05); border: 1px solid var(--border-glass); padding: 1px 5px; border-radius: 3px;"
                   title="国家: {{ geo.country }}&#10;城市: {{ geo.city }}&#10;运营商/ASN: {{ geo.asn }}">
@@ -70,7 +71,7 @@
                 hx-delete="/api/nodes/{{ node.id }}/ports/{{ data.port }}/rules/{{ rule.num }}"
                 hx-target="#port-card-{{ data.port }}"
                 hx-swap="outerHTML"
-                hx-confirm="确定删除放行规则：{{ rule.ip }} -> 端口 {{ data.port }} ({{ rule.proto | upper }}) 吗？"
+                hx-confirm="确定删除放行规则：{{ clean_ip }} -> 端口 {{ data.port }} ({{ rule.proto | upper }}) 吗？"
                 title="删除此规则">
               ✕
             </button>
