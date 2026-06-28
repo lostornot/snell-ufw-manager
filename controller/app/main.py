@@ -395,28 +395,52 @@ async def logs_page(request: Request):
 
 @app.get("/api/nodes/{node_id}/summary", response_class=HTMLResponse)
 async def api_node_summary(request: Request, node_id: int):
-    """SSH query node status and list ports, return card summary."""
+    """SSH query node status and environment, return card summary."""
     node = await db.get_node(node_id)
     if not node:
         return f'<div class="glass-card">节点不存在 ({node_id})</div>'
 
     result = await ssh.test_connection(node)
     if result.get("ok"):
-        # Fetch UFW rules to count active ports
-        wl_result = await ssh.get_whitelist(node)
+        # Fetch environment details (docker, tailscale, ports)
+        env_result = await ssh.detect_environment(node)
         ports = []
-        if wl_result.get("ok"):
-            unique_ports = set()
-            for r in wl_result.get("rules", []):
-                unique_ports.add(r.get("port"))
-            ports = sorted(list(unique_ports))
+        docker_risk = "none"
+        docker_active = False
+        tailscale_ip = ""
         
+        if env_result.get("ok"):
+            snell_info = env_result.get("snell", {})
+            if snell_info.get("port"):
+                ports.append(str(snell_info["port"]))
+            
+            docker_info = env_result.get("docker", {})
+            docker_active = docker_info.get("running", False)
+            docker_risk = docker_info.get("risk", "none")
+            
+            ts_info = env_result.get("tailscale", {})
+            tailscale_ip = ts_info.get("ip", "")
+
+            # Sync node state in DB
+            await db.update_node(
+                node_id,
+                nftables_active=1 if result.get("nftables_active") else 0,
+                docker_detected=1 if docker_active else 0,
+                docker_risk=docker_risk,
+                tailscale_ip=tailscale_ip,
+                last_checked_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            )
+            
         status = {
             "online": True,
-            "ufw_status": result.get("ufw_status", "unknown"),
+            "ufw_status": "inactive" if result.get("nftables_active") else "active", # Compatibility label
+            "nftables_active": result.get("nftables_active", False),
             "uptime": result.get("uptime", "unknown"),
             "kernel": result.get("kernel", "unknown"),
-            "ports": ports
+            "ports": ports,
+            "docker_active": docker_active,
+            "docker_risk": docker_risk,
+            "tailscale_ip": tailscale_ip
         }
     else:
         status = {
@@ -467,49 +491,67 @@ async def api_ping_node(request: Request, node_id: int):
 
 @app.get("/api/nodes/{node_id}/ports", response_class=HTMLResponse)
 async def api_port_cards_grid(request: Request, node_id: int):
-    """Fetch live rules from VPS and construct the Port Cards Grid."""
+    """Fetch live policies for the node and construct the Service Policies Grid."""
     node = await db.get_node(node_id)
     if not node:
         raise HTTPException(status_code=404)
 
-    wl_result = await ssh.get_whitelist(node)
-    if not wl_result.get("ok"):
-        return f'<div class="empty-state" style="color:var(--accent-red); font-weight:600; padding:24px;">❌ 获取防火墙规则失败: {wl_result.get("error")}</div>'
-
-    rules = wl_result.get("rules", [])
+    # 1. Fetch node environment details (like active listening status)
+    env_result = await ssh.detect_environment(node)
     
-    # Group rules by port number
+    # 2. Get local policies assigned to this node
+    policies = await db.get_node_policies(node_id)
+    
+    # Initialize standard default policies if none assigned yet
+    if not policies:
+        snell_port = node["snell_port"]
+        # Create standard Snell policy
+        snell_policy_id = await db.create_policy(
+            name="Snell 代理服务",
+            service="snell",
+            port=snell_port,
+            protocol="tcp+udp",
+            allow_sets="relay_ips,direct_ips",
+            default_action="drop"
+        )
+        await db.link_node_policy(node_id, snell_policy_id)
+
+        # Create standard SSH policy
+        ssh_port = node.get("ssh_port", 22)
+        ssh_policy_id = await db.create_policy(
+            name="SSH 管理访问",
+            service="ssh",
+            port=ssh_port,
+            protocol="tcp",
+            allow_sets="tailscale_ips,direct_ips",
+            default_action="drop"
+        )
+        await db.link_node_policy(node_id, ssh_policy_id)
+        
+        # Reload policies
+        policies = await db.get_node_policies(node_id)
+
+    # 3. Structure policy data for templating
+    # We will pass policy items as structured card items
     port_data = {}
-    for r in rules:
-        port = str(r.get("port"))
-        proto = r.get("proto", "all")
-        
-        if port not in port_data:
-            port_data[port] = {
-                "port": port,
-                "protocol_label": proto,
-                "rules": []
-            }
-        
-        if r.get("ip"):
-            port_data[port]["rules"].append(r)
+    for p in policies:
+        svc = p["service"]
+        port_data[svc] = {
+            "id": p["id"],
+            "name": p["name"],
+            "service": svc,
+            "port": p["port"],
+            "protocol": p["protocol"],
+            "allow_sets": [s.strip() for s in p["allow_sets"].split(",") if s.strip()],
+            "default_action": p["default_action"],
+            "enabled": p["node_enabled"],
+            "last_applied_at": p["last_applied_at"],
+            "last_apply_status": p["last_apply_status"],
+            "last_error": p["last_error"]
+        }
 
-    # Standardize protocol labels
-    for p, p_info in port_data.items():
-        protos = {r["proto"] for r in p_info["rules"]}
-        if "tcp" in protos and "udp" in protos:
-            p_info["protocol_label"] = "tcp+udp"
-        elif "tcp" in protos:
-            p_info["protocol_label"] = "tcp"
-        elif "udp" in protos:
-            p_info["protocol_label"] = "udp"
-        else:
-            p_info["protocol_label"] = "all"
-
-    # Get IP remarks for display
+    # Fetch geo info maps for display if required
     ip_remarks = await db.get_ip_remarks_map()
-    all_ips = [r["ip"] for r in rules if r.get("ip")]
-    ip_geos = await get_bulk_ip_geo(all_ips)
 
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
@@ -517,490 +559,177 @@ async def api_port_cards_grid(request: Request, node_id: int):
             "request": request, 
             "node": node, 
             "port_data": port_data, 
-            "ip_remarks": ip_remarks,
-            "ip_geos": ip_geos
+            "env_status": env_result.get("snell", {}) if env_result.get("ok") else {},
+            "docker_status": env_result.get("docker", {}) if env_result.get("ok") else {},
+            "ip_remarks": ip_remarks
         },
     )
 
 
 @app.post("/api/nodes/{node_id}/ports", response_class=HTMLResponse)
-async def api_open_port(
+async def api_apply_policy(
     request: Request,
     node_id: int,
-    port: int = Form(...),
-    protocol: str = Form("both"),
-    service_tag: str = Form("Custom Rule"),
-    initial_ip: str = Form(""),
-    ip_tag: str = Form(""),
-    ip_tag_select: str = Form(""),
-    target_node_ids: list[str] = Form(default=[]),
+    snell_allow: list[str] = Form(default=[]),
+    ssh_allow: list[str] = Form(default=[]),
+    iperf3_allow: list[str] = Form(default=[]),
 ):
-    """Open a UFW service port on multiple nodes and return updated Port Cards Grid for current node."""
-    current_node = await db.get_node(node_id)
-    if not current_node:
-        raise HTTPException(status_code=404)
-
-    if port < 1 or port > 65535:
-        raise HTTPException(status_code=400, detail="Invalid port number")
-
-    # Determine whitelist targets: either a single IP or all IPs under a tag
-    targets = []
-    tag_label = ip_tag.strip()
-
-    if initial_ip and initial_ip.strip():
-        targets.append((initial_ip.strip(), "IP"))
-    elif ip_tag_select and ip_tag_select.strip():
-        # Load all IPs with this tag for batch deployment
-        tag_ips = await db.get_ips_by_tag(ip_tag_select.strip())
-        tag_label = ip_tag_select.strip()
-        for item in tag_ips:
-            targets.append((item["ip_cidr"], f"标签: {tag_label}"))
-        if not targets:
-            toast = {"type": "error", "message": f"❌ 标签「{tag_label}」下没有任何 IP 地址"}
-            return await render_ports_grid_with_toast(request, current_node, toast)
-    else:
-        # Default: open to Anywhere
-        targets.append(("anywhere", "Public Access"))
-
-    # Validate all targets first
-    for ip, desc in targets:
-        if not validate_ip_cidr(ip):
-            toast = {"type": "error", "message": f"❌ 无效的 IP/CIDR 地址: {ip}"}
-            return await render_ports_grid_with_toast(request, current_node, toast)
-
-    # Combined nodes list (current + target check boxes)
-    nodes_to_process = [node_id]
-    for tid in target_node_ids:
-        try:
-            val = int(tid)
-            if val != node_id:
-                nodes_to_process.append(val)
-        except ValueError:
-            pass
-
-    success_nodes = []
-    failed_nodes = []
-
-    for nid in nodes_to_process:
-        target_node = await db.get_node(nid)
-        if not target_node:
-            continue
-
-        # Fetch current node's rules to avoid duplicate config (idempotency check)
-        wl_result = await ssh.get_whitelist(target_node)
-        existing_rules = wl_result.get("rules", []) if wl_result.get("ok") else []
-
-        targets_to_add = []
-        for ip, desc in targets:
-            # Check if this IP/CIDR is already whitelisted on this port with desired protocol
-            has_tcp = False
-            has_udp = False
-            for r in existing_rules:
-                if str(r.get("port")) == str(port) and r.get("ip") == ip:
-                    if r.get("proto") == "tcp":
-                        has_tcp = True
-                    elif r.get("proto") == "udp":
-                        has_udp = True
-                    elif r.get("proto") == "all":
-                        has_tcp = True
-                        has_udp = True
-
-            already_allowed = False
-            if protocol == "tcp" and has_tcp:
-                already_allowed = True
-            elif protocol == "udp" and has_udp:
-                already_allowed = True
-            elif protocol == "both" and has_tcp and has_udp:
-                already_allowed = True
-
-            if not already_allowed:
-                targets_to_add.append(ip)
-
-        if not targets_to_add:
-            # Rules already exist, skip execution
-            await db.add_op_log(
-                nid,
-                target_node["name"],
-                "OPEN_PORT",
-                f"{port}",
-                f"跳过端口 {port}/{protocol} 配置：对应的 IP 白名单规则在此节点已存在，无需重复配置。",
-                True
-            )
-            success_nodes.append(target_node["name"])
-            continue
-
-        # Execute SSH add commands
-        node_success = True
-        node_error_msg = ""
-        added_ips = []
-
-        for ip in targets_to_add:
-            result = await ssh.run(target_node, f"add {ip} {port} {protocol}")
-            if not result.get("ok"):
-                node_success = False
-                node_error_msg = result.get("error", "添加规则失败")
-                break
-            added_ips.append(ip)
-
-        if node_success:
-            log_detail = f"批量部署开通端口 {port}/{protocol} ({service_tag})。授权: {', '.join(added_ips)}"
-            await db.add_op_log(nid, target_node["name"], "OPEN_PORT", f"{port}", log_detail, True)
-            success_nodes.append(target_node["name"])
-        else:
-            log_detail = f"批量部署端口 {port}/{protocol} ({service_tag}) 失败。尝试授权: {', '.join(targets_to_add)}，原因: {node_error_msg}"
-            await db.add_op_log(nid, target_node["name"], "OPEN_PORT", f"{port}", log_detail, False)
-            failed_nodes.append(f"{target_node['name']} ({node_error_msg})")
-
-    # Register IPs with tags in ip_addresses table
-    if success_nodes:
-        for ip, desc in targets:
-            if ip not in ("anywhere", "any", "all"):
-                await db.upsert_ip_address(ip, tag_label, "bulk_deploy")
-
-    # Generate comprehensive toast message
-    if failed_nodes:
-        if success_nodes:
-            toast = {
-                "type": "error",
-                "message": f"⚠️ 批量部署部分完成。成功: {', '.join(success_nodes)}；失败: {', '.join(failed_nodes)}"
-            }
-        else:
-            toast = {
-                "type": "error",
-                "message": f"❌ 批量部署失败。原因: {', '.join(failed_nodes)}"
-            }
-    else:
-        toast = {
-            "type": "success",
-            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上开放端口 {port} 并部署白名单！"
-        }
-
-    # Re-render current node's ports grid with toast
-    refreshed_tags = await db.get_all_tags()
-    return await render_ports_grid_with_toast(request, current_node, toast, all_tags=refreshed_tags)
-
-
-@app.post("/api/nodes/{node_id}/ports/bulk-delete", response_class=HTMLResponse)
-async def api_bulk_delete_port_rule(
-    request: Request,
-    node_id: int,
-    port: int = Form(...),
-    protocol: str = Form("both"),
-    initial_ip: str = Form(""),
-    ip_tag_select: str = Form(""),
-    target_node_ids: list[str] = Form(default=[]),
-):
-    """Bulk delete whitelisted IP/tag on a port across multiple nodes."""
-    current_node = await db.get_node(node_id)
-    if not current_node:
-        raise HTTPException(status_code=404)
-
-    # Determine targets to delete
-    targets = []
-    desc_label = ""
-    if initial_ip and initial_ip.strip():
-        targets.append(initial_ip.strip())
-        desc_label = f"IP: {initial_ip.strip()}"
-    elif ip_tag_select and ip_tag_select.strip():
-        tag_ips = await db.get_ips_by_tag(ip_tag_select.strip())
-        for item in tag_ips:
-            targets.append(item["ip_cidr"])
-        desc_label = f"标签: {ip_tag_select.strip()}"
-
-    if not targets:
-        toast = {"type": "error", "message": "❌ 请输入 IP 或选择标签来批量删除白名单！"}
-        return await render_ports_grid_with_toast(request, current_node, toast)
-
-    # Validate all targets first
-    for ip in targets:
-        if not validate_ip_cidr(ip):
-            toast = {"type": "error", "message": f"❌ 无效的 IP/CIDR 地址: {ip}"}
-            return await render_ports_grid_with_toast(request, current_node, toast)
-
-    # Combined nodes list (current + target check boxes)
-    nodes_to_process = [node_id]
-    for tid in target_node_ids:
-        try:
-            val = int(tid)
-            if val != node_id:
-                nodes_to_process.append(val)
-        except ValueError:
-            pass
-
-    success_nodes = []
-    failed_nodes = []
-
-    for nid in nodes_to_process:
-        target_node = await db.get_node(nid)
-        if not target_node:
-            continue
-
-        node_success = True
-        node_error_msg = ""
-        deleted_ips = []
-
-        for ip in targets:
-            result = await ssh.run(target_node, f"delete {ip} {port}")
-            if not result.get("ok"):
-                node_success = False
-                node_error_msg = result.get("error", "删除规则失败")
-                break
-            deleted_ips.append(ip)
-
-        if node_success:
-            log_detail = f"批量关闭删除白名单。端口: {port}，目标: {desc_label} ({', '.join(deleted_ips)})"
-            await db.add_op_log(nid, target_node["name"], "DELETE_RULE", f"{port}", log_detail, True)
-            success_nodes.append(target_node["name"])
-        else:
-            log_detail = f"批量删除白名单失败。端口: {port}，目标: {desc_label}，原因: {node_error_msg}"
-            await db.add_op_log(nid, target_node["name"], "DELETE_RULE", f"{port}", log_detail, False)
-            failed_nodes.append(f"{target_node['name']} ({node_error_msg})")
-
-    # Generate comprehensive toast message
-    if failed_nodes:
-        if success_nodes:
-            toast = {
-                "type": "error",
-                "message": f"⚠️ 批量删除部分完成。成功: {', '.join(success_nodes)}；失败: {', '.join(failed_nodes)}"
-            }
-        else:
-            toast = {
-                "type": "error",
-                "message": f"❌ 批量删除规则失败。原因: {', '.join(failed_nodes)}"
-            }
-    else:
-        toast = {
-            "type": "success",
-            "message": f"✅ 已成功在所有选中节点 ({', '.join(success_nodes)}) 上，针对端口 {port} 删除了对应的白名单！"
-        }
-
-    # Re-render current node's ports grid with toast
-    return await render_ports_grid_with_toast(request, current_node, toast)
-
-
-@app.delete("/api/nodes/{node_id}/ports/{port}", response_class=HTMLResponse)
-async def api_close_port(request: Request, node_id: int, port: int):
-    """Delete all rules associated with a port on the remote node."""
+    """
+    Apply unified nftables firewall policy to the node.
+    Includes anti-lockout SSH connection validation:
+    1. Apply policy temporarily (lock is active for 15s)
+    2. Try connecting back via SSH. If succeeded within 5s, confirm policy.
+    3. If failed, allow automatic rollback.
+    """
     node = await db.get_node(node_id)
     if not node:
         raise HTTPException(status_code=404)
 
-    # Query live rules to extract matching rule numbers
-    wl_result = await ssh.get_whitelist(node)
-    if not wl_result.get("ok"):
-        toast = {"type": "error", "message": f"❌ 关闭端口失败: 无法拉取 UFW 状态 ({wl_result.get('error')})"}
+    # 1. Fetch IP lists for each active source set from db
+    relay_items = await db.get_ips_by_tag("relay_ips")
+    direct_items = await db.get_ips_by_tag("direct_ips")
+    ts_items = await db.get_ips_by_tag("tailscale_ips")
+    cn_items = await db.get_ips_by_tag("cn_ips")
+    temp_items = await db.get_ips_by_tag("temp_ips")
+
+    relay_ips = [item["ip_cidr"] for item in relay_items]
+    direct_ips = [item["ip_cidr"] for item in direct_items]
+    ts_ips = [item["ip_cidr"] for item in ts_items]
+    cn_ips = [item["ip_cidr"] for item in cn_items]
+    temp_ips = [item["ip_cidr"] for item in temp_items]
+
+    # Package policy schema
+    policy_data = {
+        "service": "combined",
+        "relay_ips": relay_ips,
+        "direct_ips": direct_ips,
+        "tailscale_ips": ts_ips,
+        "cn_ips": cn_ips,
+        "temp_ips": temp_ips,
+        "policies": [
+            {
+                "service": "snell",
+                "relay_ips": True if "relay_ips" in snell_allow else False,
+                "direct_ips": True if "direct_ips" in snell_allow else False,
+                "cn_ips": True if "cn_ips" in snell_allow else False,
+                "temp_ips": True if "temp_ips" in snell_allow else False,
+            },
+            {
+                "service": "ssh",
+                "tailscale_ips": True if "tailscale_ips" in ssh_allow else False,
+                "direct_ips": True if "direct_ips" in ssh_allow else False,
+            },
+            {
+                "service": "iperf3",
+                "temp_ips": True if "temp_ips" in iperf3_allow else False,
+            }
+        ]
+    }
+    policy_json = json.dumps(policy_data)
+
+    # 2. Plan check (dry-run)
+    plan_res = await ssh.plan_policy(node, policy_json)
+    if not plan_res.get("ok"):
+        toast = {"type": "error", "message": f"❌ 规则校验失败: {plan_res.get('error')}"}
         return await render_ports_grid_with_toast(request, node, toast)
 
-    # Filter rules matching the port
-    rules = [r for r in wl_result.get("rules", []) if str(r.get("port")) == str(port)]
+    # 3. Apply Policy Temporarily
+    apply_res = await ssh.apply_policy(node, policy_json)
+    if not apply_res.get("ok"):
+        toast = {"type": "error", "message": f"❌ 策略加载失败: {apply_res.get('error')}"}
+        return await render_ports_grid_with_toast(request, node, toast)
+
+    # 4. Perform Anti-lockout validation (try connecting again)
+    validation_success = False
+    await asyncio.sleep(1.0) # Let rule load settle down
     
-    # Sort rule indexes descending to avoid shift errors
-    rule_nums = sorted([r["num"] for r in rules], reverse=True)
+    try:
+        # We test connection with a short timeout to confirm SSH is still up
+        test_res = await asyncio.wait_for(ssh.test_connection(node), timeout=5.0)
+        if test_res.get("ok"):
+            validation_success = True
+    except Exception:
+        pass
 
-    success = True
-    error_msg = ""
-    deleted_count = 0
-
-    for num in rule_nums:
-        result = await ssh.run(node, f"delete_num {num}")
-        if not result.get("ok"):
-            success = False
-            error_msg = result.get("error", "删除失败")
-            break
-        deleted_count += 1
-
-    # Log operation
-    log_detail = f"关闭服务端口 {port}，删除了 {deleted_count} 条 UFW 规则。"
-    if not success:
-        log_detail += f" (中途失败: {error_msg})"
-    await db.add_op_log(node_id, node["name"], "CLOSE_PORT", f"{port}", log_detail, success)
-
-    toast = None
-    if not success:
-        toast = {"type": "error", "message": f"❌ 部分规则删除失败: {error_msg}"}
+    # 5. Confirm or Let Rollback
+    if validation_success:
+        confirm_res = await ssh.confirm_policy(node)
+        if confirm_res.get("ok"):
+            toast = {"type": "success", "message": "✅ 防火墙策略应用并持久化成功！已验证 SSH 通道正常！"}
+            # Log success
+            await db.add_op_log(
+                node_id, node["name"], "APPLY_POLICY", "all",
+                f"成功应用 nftables 策略。Snell 允许: {','.join(snell_allow)}; SSH 允许: {','.join(ssh_allow)}",
+                True
+            )
+            
+            # Sync local policies table (Standard Snell + SSH + iPerf3)
+            # Find and update local database states
+            db_policies = await db.get_node_policies(node_id)
+            for db_p in db_policies:
+                svc = db_p["service"]
+                allow_str = ""
+                if svc == "snell":
+                    allow_str = ",".join(snell_allow)
+                elif svc == "ssh":
+                    allow_str = ",".join(ssh_allow)
+                elif svc == "iperf3":
+                    allow_str = ",".join(iperf3_allow)
+                
+                await db.update_node_policy_status(node_id, db_p["id"], "applied")
+        else:
+            toast = {"type": "error", "message": f"❌ 确认失败: {confirm_res.get('error')}"}
     else:
-        toast = {"type": "success", "message": f"✅ 端口 {port} 已成功关闭并清理规则！"}
+        toast = {
+            "type": "error",
+            "message": "⚠️ 警告：检测到 SSH 连接可能被防火墙拦截，已自动执行安全回退（Rollback）！"
+        }
+        await db.add_op_log(
+            node_id, node["name"], "APPLY_POLICY", "all",
+            "应用策略后 SSH 检测超时，触发防锁死安全回退。",
+            False
+        )
 
     return await render_ports_grid_with_toast(request, node, toast)
 
 
-# Helper to re-render the grid
 async def render_ports_grid_with_toast(request: Request, node: dict, toast: dict | None, all_tags: list | None = None):
-    wl_result = await ssh.get_whitelist(node)
-    rules = wl_result.get("rules", []) if wl_result.get("ok") else []
+    """Helper to re-render the port/policy cards grid with feedback message."""
+    env_result = await ssh.detect_environment(node)
+    policies = await db.get_node_policies(node["id"])
+    
     port_data = {}
-    for r in rules:
-        port = str(r.get("port"))
-        proto = r.get("proto", "all")
-        if port not in port_data:
-            port_data[port] = {"port": port, "protocol_label": proto, "rules": []}
-        if r.get("ip"):
-            port_data[port]["rules"].append(r)
-            
-    for p, p_info in port_data.items():
-        protos = {r["proto"] for r in p_info["rules"]}
-        if "tcp" in protos and "udp" in protos:
-            p_info["protocol_label"] = "tcp+udp"
-        elif "tcp" in protos:
-            p_info["protocol_label"] = "tcp"
-        elif "udp" in protos:
-            p_info["protocol_label"] = "udp"
-        else:
-            p_info["protocol_label"] = "all"
+    for p in policies:
+        svc = p["service"]
+        port_data[svc] = {
+            "id": p["id"],
+            "name": p["name"],
+            "service": svc,
+            "port": p["port"],
+            "protocol": p["protocol"],
+            "allow_sets": [s.strip() for s in p["allow_sets"].split(",") if s.strip()],
+            "default_action": p["default_action"],
+            "enabled": p["node_enabled"],
+            "last_applied_at": p["last_applied_at"],
+            "last_apply_status": p["last_apply_status"],
+            "last_error": p["last_error"]
+        }
 
-    # Get IP remarks for display
     ip_remarks = await db.get_ip_remarks_map()
 
     return templates.TemplateResponse(
         "partials/port_cards_grid.html",
-        {"request": request, "node": node, "port_data": port_data, "toast": toast, "ip_remarks": ip_remarks, "all_tags": all_tags},
-    )
-
-
-# ---------------------------------------------------------------------------
-# API: Port Card Whitelist Operations
-# ---------------------------------------------------------------------------
-
-@app.post("/api/nodes/{node_id}/ports/{port}/ips", response_class=HTMLResponse)
-async def api_whitelist_ip(
-    request: Request,
-    node_id: int,
-    port: int,
-    ip_cidr: str = Form(...),
-    remark: str = Form(""),
-):
-    """Whitelist a single IP/CIDR or expand a tag on this port card."""
-    node = await db.get_node(node_id)
-    if not node:
-        raise HTTPException(status_code=404)
-
-    ip_cidr = ip_cidr.strip()
-    remark = remark.strip()
-    success = True
-    added_ips = []
-    error_msg = ""
-
-    # Check if input matches an existing tag name → batch expand
-    all_tags = await db.get_all_tags()
-    matching_tag = None
-    for t in all_tags:
-        if t.lower() == ip_cidr.lower():
-            matching_tag = t
-            break
-
-    if matching_tag:
-        # Expand tag and add all IPs
-        tag_ips = await db.get_ips_by_tag(matching_tag)
-        for item in tag_ips:
-            ip = item["ip_cidr"]
-            result = await ssh.run(node, f"add {ip} {port} both")
-            if not result.get("ok"):
-                success = False
-                error_msg = result.get("error")
-                break
-            added_ips.append(ip)
-        log_detail = f"批量授权标签「{matching_tag}」到端口 {port}。IP列表: {', '.join(added_ips)}"
-    else:
-        # Standalone IP/CIDR
-        if not validate_ip_cidr(ip_cidr):
-            success = False
-            error_msg = f"无效的 IP/CIDR 地址: {ip_cidr}"
-        else:
-            result = await ssh.run(node, f"add {ip_cidr} {port} both")
-            if not result.get("ok"):
-                success = False
-                error_msg = result.get("error")
-            else:
-                added_ips.append(ip_cidr)
-                # Register IP with tag
-                if ip_cidr not in ("anywhere", "any", "all"):
-                    await db.upsert_ip_address(ip_cidr, remark, "manual")
-        log_detail = f"授权 {ip_cidr} 到端口 {port}。"
-
-    if not success:
-        log_detail += f" (失败: {error_msg})"
-    await db.add_op_log(node_id, node["name"], "ALLOW_IP", f"{ip_cidr}:{port}", log_detail, success)
-
-    toast = None
-    if not success:
-        toast = {"type": "error", "message": f"❌ 授权失败: {error_msg}"}
-    else:
-        tag_label = f" 标签「{matching_tag}」" if matching_tag else ""
-        toast = {"type": "success", "message": f"✅ 已成功将{tag_label} {ip_cidr} 放行到端口 {port}"}
-
-    # Re-render single port card
-    return await render_single_port_card(request, node, port, toast)
-
-
-@app.delete("/api/nodes/{node_id}/ports/{port}/rules/{num}", response_class=HTMLResponse)
-async def api_remove_rule(request: Request, node_id: int, port: int, num: int):
-    """Remove a single specific rule number from UFW and re-render card."""
-    node = await db.get_node(node_id)
-    if not node:
-        raise HTTPException(status_code=404)
-
-    # Run command
-    result = await ssh.run(node, f"delete_num {num}")
-    success = result.get("ok", False)
-    error_msg = result.get("error", "删除失败") if not success else ""
-
-    # Log operation
-    log_detail = f"删除端口 {port} 下的 UFW 规则 #{num}"
-    if not success:
-        log_detail += f" (失败: {error_msg})"
-    await db.add_op_log(node_id, node["name"], "REMOVE_IP", f"Rule #{num}", log_detail, success)
-
-    toast = None
-    if not success:
-        toast = {"type": "error", "message": f"❌ 删除规则失败: {error_msg}"}
-    else:
-        toast = {"type": "success", "message": f"✅ 规则 #{num} 已被成功移除"}
-
-    return await render_single_port_card(request, node, port, toast)
-
-
-# Helper to re-render single card
-async def render_single_port_card(request: Request, node: dict, port: int, toast: dict | None):
-    wl_result = await ssh.get_whitelist(node)
-    rules = wl_result.get("rules", []) if wl_result.get("ok") else []
-    
-    # Filter rules for this port
-    port_rules = [r for r in rules if str(r.get("port")) == str(port)]
-    protos = {r["proto"] for r in port_rules}
-    
-    if "tcp" in protos and "udp" in protos:
-        proto_label = "tcp+udp"
-    elif "tcp" in protos:
-        proto_label = "tcp"
-    elif "udp" in protos:
-        proto_label = "udp"
-    else:
-        proto_label = "both"
-
-    data = {
-        "port": port,
-        "protocol_label": proto_label,
-        "rules": port_rules
-    }
-
-    # Get IP remarks and geodata for display
-    ip_remarks = await db.get_ip_remarks_map()
-    port_ips = [r["ip"] for r in port_rules if r.get("ip")]
-    ip_geos = await get_bulk_ip_geo(port_ips)
-
-    resp = templates.TemplateResponse(
-        "partials/port_card.html",
         {
             "request": request, 
             "node": node, 
-            "data": data, 
-            "toast": toast, 
+            "port_data": port_data, 
+            "env_status": env_result.get("snell", {}) if env_result.get("ok") else {},
+            "docker_status": env_result.get("docker", {}) if env_result.get("ok") else {},
+            "toast": toast,
             "ip_remarks": ip_remarks,
-            "ip_geos": ip_geos
+            "all_tags": all_tags
         },
     )
-    resp.headers["HX-Trigger"] = "rules-updated"
-    return resp
 
 
 # ---------------------------------------------------------------------------

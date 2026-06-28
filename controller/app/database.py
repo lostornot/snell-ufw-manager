@@ -502,3 +502,50 @@ async def cache_ip_geo(ip: str, country: str, country_code: str, city: str, asn:
             (ip, country, country_code, city, asn),
         )
         await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# Policies & Node Policies
+# ---------------------------------------------------------------------------
+
+async def get_node_policies(node_id: int) -> list[dict]:
+    """Get all policy records associated with a given node."""
+    async with _get_db() as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """SELECT p.*, np.enabled as node_enabled, np.last_applied_at, np.last_apply_status, np.last_error
+               FROM policies p
+               JOIN node_policies np ON p.id = np.policy_id
+               WHERE np.node_id = ?""",
+            (node_id,)
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+async def create_policy(name: str, service: str, port: int, protocol: str, allow_sets: str, default_action: str = 'drop', enabled: int = 1) -> int:
+    async with _get_db() as db:
+        cursor = await db.execute(
+            """INSERT INTO policies (name, service, port, protocol, allow_sets, default_action, enabled)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (name, service, port, protocol, allow_sets, default_action, enabled)
+        )
+        await db.commit()
+        return cursor.lastrowid
+
+async def link_node_policy(node_id: int, policy_id: int) -> None:
+    async with _get_db() as db:
+        await db.execute(
+            """INSERT OR IGNORE INTO node_policies (node_id, policy_id, enabled)
+               VALUES (?, ?, 1)""",
+            (node_id, policy_id)
+        )
+        await db.commit()
+
+async def update_node_policy_status(node_id: int, policy_id: int, status: str, error_msg: str = "") -> None:
+    async with _get_db() as db:
+        await db.execute(
+            """UPDATE node_policies
+               SET last_applied_at = datetime('now'), last_apply_status = ?, last_error = ?
+               WHERE node_id = ? AND policy_id = ?""",
+            (status, error_msg, node_id, policy_id)
+        )
+        await db.commit()
