@@ -4,12 +4,12 @@
 
 set -euo pipefail
 
-APP_DIR="/opt/snell-ufw-manager"
+APP_DIR="/opt/multi-vps-firewall-manager"
 VENV_DIR="${APP_DIR}/venv"
 DATA_DIR="${APP_DIR}/controller/data"
 BACKUP_DIR="${APP_DIR}/backups"
 SSH_KEY="/root/.ssh/snellmgr_ed25519"
-SERVICE_NAME="snell-ufw-manager"
+SERVICE_NAME="multi-vps-firewall-manager"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -22,7 +22,7 @@ error() { echo -e "  ${RED}✗${NC} $1"; }
 
 echo ""
 echo "══════════════════════════════════════════"
-echo " Snell UFW Manager — 控制中心安装"
+echo " Multi-VPS Firewall Manager — 控制中心安装"
 echo "══════════════════════════════════════════"
 echo ""
 
@@ -119,7 +119,7 @@ info "完成"
 echo -n "  安装 systemd 服务... "
 cat > /etc/systemd/system/${SERVICE_NAME}.service << SYSTEMD_EOF
 [Unit]
-Description=Snell UFW Manager
+Description=Multi-VPS Firewall Manager
 After=network.target
 
 [Service]
@@ -128,7 +128,7 @@ User=root
 WorkingDirectory=${APP_DIR}/controller
 Environment=SNELL_DB=${DATA_DIR}/snell_manager.db
 Environment=SNELL_CONFIG=${APP_DIR}/controller/config.yaml
-ExecStart=${VENV_DIR}/bin/uvicorn app.main:app --host 127.0.0.1 --port 8899 --workers 1
+ExecStart=${VENV_DIR}/bin/uvicorn app.main:app --host 127.0.0.1 --port 7899 --workers 1
 Restart=on-failure
 RestartSec=5
 
@@ -161,13 +161,13 @@ MACHINE_IP=$(hostname -I 2>/dev/null | awk '{print $1}' || echo "<本机IP>")
 
 echo ""
 echo "══════════════════════════════════════════"
-echo -e " ${GREEN}✅ Snell UFW Manager 已启动${NC}"
+echo -e " ${GREEN}✅ Multi-VPS Firewall Manager 已启动${NC}"
 echo ""
 echo " 在本地执行以下命令访问面板："
-echo -e "   ${YELLOW}ssh -L 8899:127.0.0.1:8899 root@${MACHINE_IP}${NC}"
+echo -e "   ${YELLOW}ssh -L 7899:127.0.0.1:7899 root@${MACHINE_IP}${NC}"
 echo ""
 echo " 然后浏览器打开："
-echo -e "   ${YELLOW}http://localhost:8899${NC}"
+echo -e "   ${YELLOW}http://localhost:7899${NC}"
 echo ""
 echo " SSH 公钥（用于节点初始化）："
 echo -e "   ${YELLOW}$(cat ${SSH_KEY}.pub)${NC}"

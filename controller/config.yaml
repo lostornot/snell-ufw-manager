@@ -1,6 +1,6 @@
 server:
   host: "127.0.0.1"
-  port: 8899
+  port: 7899
 
 ssh:
   private_key_path: "/root/.ssh/snellmgr_ed25519"

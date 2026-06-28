@@ -1,4 +1,4 @@
-"""Configuration management for Snell UFW Manager."""
+"""Configuration management for Multi-VPS Firewall Manager."""
 
 import os
 from dataclasses import dataclass, field
@@ -10,7 +10,7 @@ import yaml
 @dataclass
 class ServerConfig:
     host: str = "127.0.0.1"
-    port: int = 8899
+    port: int = 7899
 
 
 @dataclass

@@ -20,7 +20,7 @@
 ## 系统架构
 
 ```
-你的浏览器 → SSH Tunnel → 控制中心 VPS (127.0.0.1:8899)
+你的浏览器 → SSH Tunnel → 控制中心 VPS (127.0.0.1:7899)
                                 ↓ SSH
                           落地节点 A (nft-fwctl)
                           落地节点 B (nft-fwctl)
@@ -51,10 +51,10 @@ bash /opt/multi-vps-firewall-manager/controller/install.sh
 
 ```bash
 # 本地终端建立安全隧道
-ssh -L 8899:127.0.0.1:8899 root@控制中心VPS
+ssh -L 7899:127.0.0.1:7899 root@控制中心VPS
 
 # 浏览器打开
-# http://localhost:8899
+# http://localhost:7899
 ```
 
 ### 3. 被控节点添加
@@ -111,7 +111,7 @@ multi-vps-firewall-manager/
 ```yaml
 server:
   host: "127.0.0.1"    # 仅本地监听，保障安全
-  port: 8899
+  port: 7899
 
 ssh:
   private_key_path: "/root/.ssh/snellmgr_ed25519"  # 控制中心 SSH 私钥

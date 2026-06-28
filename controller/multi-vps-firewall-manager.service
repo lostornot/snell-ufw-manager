@@ -1,0 +1,18 @@
+[Unit]
+Description=Multi-VPS Firewall Manager
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/multi-vps-firewall-manager/controller
+Environment=SNELL_DB=/opt/multi-vps-firewall-manager/controller/data/snell_manager.db
+Environment=SNELL_CONFIG=/opt/multi-vps-firewall-manager/controller/config.yaml
+ExecStart=/opt/multi-vps-firewall-manager/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 7899 --workers 1
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
