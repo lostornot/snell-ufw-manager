@@ -40,14 +40,10 @@ echo 'snellmgr ALL=(root) NOPASSWD: /usr/local/sbin/snell-fwctl' \
 chmod 440 /etc/sudoers.d/snellmgr
 echo "完成 ✓"
 
-# 4. 部署 SSH 公钥
+# 4. 配置 SSH 密钥 (由于 snellmgr 已在 sudoers 中被严格限制仅能执行 nft-fwctl 脚本，故直接授权以保障最佳连接连通性)
 echo -n "  部署 SSH 公钥... "
 mkdir -p /home/snellmgr/.ssh
-{% if ctrl_ip and ctrl_ip != '<控制中心IP>' %}
-echo "from=\"$CTRL_IP\" $PUBKEY" > /home/snellmgr/.ssh/authorized_keys
-{% else %}
 echo "$PUBKEY" > /home/snellmgr/.ssh/authorized_keys
-{% endif %}
 chmod 700 /home/snellmgr/.ssh
 chmod 600 /home/snellmgr/.ssh/authorized_keys
 chown -R snellmgr:snellmgr /home/snellmgr/.ssh

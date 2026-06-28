@@ -123,13 +123,18 @@ class SSHExecutor:
             return ""
 
     def get_controller_ip(self) -> str:
-        """Best-effort guess of this machine's public IP (for setup script)."""
-        import socket
+        """Fetch the controller's public IPv4 address (best-effort) for node setup guidance."""
+        import urllib.request
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
+            with urllib.request.urlopen("https://api.ipify.org", timeout=4) as response:
+                return response.read().decode("utf-8").strip()
         except Exception:
-            return "<控制中心IP>"
+            import socket
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                ip = s.getsockname()[0]
+                s.close()
+                return ip
+            except Exception:
+                return "<控制中心IP>"
